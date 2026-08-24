@@ -19,6 +19,16 @@ from app.services.optimizer import (
     run_optimization_pipeline,
     solve_block_schedule,
 )
+from app.services.rescheduler import (
+    RescheduleAction,
+    RescheduleOutcome,
+    SLWAdvisory,
+    ScheduledBlockPlan,
+    apply_greedy_time_shift,
+    format_slw_advisory_text,
+    generate_slw_advisory,
+    reschedule_on_disruption,
+)
 
 __all__ = [
     "CorridorGap",
@@ -35,4 +45,13 @@ __all__ = [
     "OptimizationResult",
     "solve_block_schedule",
     "run_optimization_pipeline",
+    "RescheduleAction",
+    "RescheduleOutcome",
+    "SLWAdvisory",
+    "ScheduledBlockPlan",
+    "apply_greedy_time_shift",
+    "format_slw_advisory_text",
+    "generate_slw_advisory",
+    "reschedule_on_disruption",
 ]
+

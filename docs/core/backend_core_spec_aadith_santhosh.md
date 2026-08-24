@@ -93,6 +93,7 @@ flowchart TD
 | **3. Corridor Gap & Headway Extractor** | 15% | ✅ Complete | **100%** |
 | **4. Shadow Block Clustering & G&SR Conflict Engine** | 15% | ✅ Complete | **100%** |
 | **5. Google OR-Tools MILP Solver** | 20% | ✅ Complete | **100%** |
-| **6. Real-Time Fast Rescheduler & SLW Fallback** | 10% | ⏳ To Implement | **0%** |
+| **6. Real-Time Fast Rescheduler & SLW Fallback** | 10% | ✅ Complete | **100%** |
 | **7. Optimizer, What-If & Statutory Export APIs** | 5% | ⏳ To Implement | **10%** |
-| **TOTAL BACKEND CORE COMPLETION** | **100%** | | **~82%** |
+| **TOTAL BACKEND CORE COMPLETION** | **100%** | | **~92%** |
+
