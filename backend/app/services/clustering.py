@@ -156,6 +156,11 @@ class CandidateShadowBlock:
         """Check if a specific maintenance request ID is included in this block."""
         return request_id in self.requests_covered_ids
 
+    @property
+    def resource_ids(self) -> Set[UUID]:
+        """Extract all resource UUIDs required by activities in this candidate block."""
+        return {act.resource_id for act in self.activities if act.resource_id is not None}
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert CandidateShadowBlock to a standard dictionary representation."""
         prim_dept = (

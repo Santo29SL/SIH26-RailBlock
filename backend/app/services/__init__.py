@@ -13,6 +13,12 @@ from app.services.clustering import (
     is_pair_compatible,
 )
 from app.services.gap_extractor import CorridorGap, extract_corridor_gaps
+from app.services.optimizer import (
+    OptimizationResult,
+    ScheduledBlock,
+    run_optimization_pipeline,
+    solve_block_schedule,
+)
 
 __all__ = [
     "CorridorGap",
@@ -25,4 +31,8 @@ __all__ = [
     "compute_criticality_index",
     "is_cluster_compatible",
     "is_pair_compatible",
+    "ScheduledBlock",
+    "OptimizationResult",
+    "solve_block_schedule",
+    "run_optimization_pipeline",
 ]
