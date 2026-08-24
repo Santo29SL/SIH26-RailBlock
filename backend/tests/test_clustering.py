@@ -538,3 +538,59 @@ def test_candidate_shadow_block_dataclass_methods():
     assert d["total_criticality_index"] == 85.0
     assert len(d["activities"]) == 1
     assert d["activities"][0]["request_code"] == "MR-TRK-001"
+
+
+def test_spatial_compatibility_descending_chainage():
+    """Verify chainage ranges with start_km > end_km are normalized correctly."""
+    sec_id = uuid.uuid4()
+    req_down1 = MockMaintenanceRequest(
+        section_id=sec_id,
+        metadata_json={"start_km": 145.0, "end_km": 142.0},  # Descending chainage
+    )
+    req_down2 = MockMaintenanceRequest(
+        section_id=sec_id,
+        metadata_json={"start_km": 148.0, "end_km": 146.0},  # Descending chainage
+    )
+    # Distance between [142, 145] and [146, 148] is 1.0 km <= 10.0 km
+    assert are_spatially_compatible(req_down1, req_down2, max_spatial_km=10.0) is True
+
+
+def test_flexible_internal_offset_scheduling():
+    """Verify shadow activities with preferred offset in metadata are scheduled flexibly within primary duration."""
+    sec_id = uuid.uuid4()
+    rules = make_standard_rules()
+
+    # Primary Track job: 180 min
+    r_primary = MockMaintenanceRequest(
+        id=uuid.uuid4(),
+        request_code="MR-TRK-010",
+        section_id=sec_id,
+        department=DepartmentEnum.TRACK,
+        activity_type="USFD Rail Inspection",
+        duration_minutes=180,
+    )
+
+    # Shadow Signal job: 60 min, with desired offset 30 min
+    r_shadow = MockMaintenanceRequest(
+        id=uuid.uuid4(),
+        request_code="MR-SIG-010",
+        section_id=sec_id,
+        department=DepartmentEnum.SIGNAL,
+        activity_type="Axle Counter Calibration",
+        duration_minutes=60,
+        metadata_json={"desired_offset_minutes": 30},
+    )
+
+    candidates = cluster_shadow_blocks(
+        requests=[r_primary, r_shadow],
+        compatibility_rules=rules,
+    )
+
+    joint_block = next((c for c in candidates if c.is_joint_shadow_block), None)
+    assert joint_block is not None
+    assert joint_block.duration_minutes == 180
+
+    shadow_act = next(a for a in joint_block.activities if not a.is_primary)
+    assert shadow_act.start_offset_minutes == 30
+    assert shadow_act.end_offset_minutes == 90
+

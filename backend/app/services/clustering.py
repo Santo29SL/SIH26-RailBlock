@@ -2,15 +2,15 @@
 
 Stage 4 Algorithmic Core for RailBlock (SIH PS 26027).
 
-Groups pending maintenance requests from Track (TMS), Signal (SMMS), and Traction (TDMS)
+Groups pending Maintenance Requests from Track (TMS), Signal (SMMS), and Traction (TDMS)
 into candidate Joint Shadow Blocks within <= 10 km spatial boundaries and Substation FP/SP
 power isolations, strictly evaluating G&SR safety conflict rules to reject incompatible
-tasks while scheduling flexible internal shadow activity offsets.
+activities while scheduling flexible internal Shadow Activity offsets.
 
-Domain terminology follows CONTEXT.md:
+Domain terminology strictly follows CONTEXT.md:
 - Section: Track segment between two consecutive block stations.
 - Feeding Post (FP) / Sectioning Post (SP): Substation traction switching installations defining electrical isolation boundaries.
-- Joint Shadow Block: Consolidated block executing multiple compatible tasks concurrently within a single traffic closure.
+- Joint Shadow Block: Consolidated block that executes multiple compatible maintenance requests from different departments concurrently within a single traffic block.
 - Primary Block: The anchor maintenance activity whose duration and spatial limits define the overall corridor window.
 - Shadow Activity: Secondary compatible maintenance task performed concurrently within the temporal boundaries of a Primary Block.
 - Criticality Index (CI): Normalized score (0-100) representing urgency, safety hazard, and operational risk.
@@ -27,7 +27,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 from uuid import UUID, uuid4
 
 from app.core.config import settings
-from app.schemas.common import DepartmentEnum, PriorityEnum
+from app.schemas.common import DepartmentEnum, LineTypeEnum, PriorityEnum
 
 
 # ── Built-in Standard Indian Railways G&SR Compatibility Knowledge Base ─────
@@ -153,7 +153,7 @@ class CandidateShadowBlock:
         return False
 
     def contains_request(self, request_id: UUID) -> bool:
-        """Check if a specific maintenance request ID is bundled in this block."""
+        """Check if a specific maintenance request ID is included in this block."""
         return request_id in self.requests_covered_ids
 
     def to_dict(self) -> Dict[str, Any]:
@@ -215,7 +215,7 @@ def _get_metadata_dict(request: Any) -> Dict[str, Any]:
 
 
 def _get_chainage_range(request: Any) -> Tuple[Optional[float], Optional[float]]:
-    """Extract start_km and end_km from request or request metadata."""
+    """Extract and normalize start_km and end_km so start_km <= end_km."""
     meta = _get_metadata_dict(request)
     start_km = getattr(request, "start_km", None) or meta.get("start_km")
     end_km = getattr(request, "end_km", None) or meta.get("end_km")
@@ -225,9 +225,13 @@ def _get_chainage_range(request: Any) -> Tuple[Optional[float], Optional[float]]
         end_km = meta.get("chainage_km")
 
     try:
-        s = float(start_km) if start_km is not None else None
-        e = float(end_km) if end_km is not None else s
-        return s, e
+        if start_km is not None and end_km is not None:
+            s, e = float(start_km), float(end_km)
+            return min(s, e), max(s, e)
+        elif start_km is not None:
+            s = float(start_km)
+            return s, s
+        return None, None
     except (ValueError, TypeError):
         return None, None
 
@@ -268,7 +272,6 @@ def compute_criticality_index(
         if key in meta and meta[key] is not None:
             try:
                 val = float(meta[key])
-                # Scale if recorded on a 0-10 scale
                 if val <= 10.0 and val > 0.0 and "index" in key:
                     val = val * 10.0
                 return round(min(100.0, max(0.0, val)), 2)
@@ -364,6 +367,33 @@ def compute_criticality_index(
 # ── G&SR Safety Rules Engine ─────────────────────────────────
 
 
+def _matches_rule(
+    dept_a: str,
+    act_a: str,
+    dept_b: str,
+    act_b: str,
+    r_dept_a: str,
+    r_act_a: str,
+    r_dept_b: str,
+    r_act_b: str,
+    exact_match: bool = False,
+) -> bool:
+    """Helper to check bidirectional match between two activity pairs and a rule."""
+    def act_match(target: str, pattern: str) -> bool:
+        if exact_match:
+            return target.lower() == pattern.lower()
+        return target.lower() == pattern.lower() or pattern.lower() in target.lower()
+
+    # Forward
+    if dept_a == r_dept_a and dept_b == r_dept_b and act_match(act_a, r_act_a) and act_match(act_b, r_act_b):
+        return True
+    # Reverse
+    if dept_a == r_dept_b and dept_b == r_dept_a and act_match(act_a, r_act_b) and act_match(act_b, r_act_a):
+        return True
+
+    return False
+
+
 def is_pair_compatible(
     req_a: Any,
     req_b: Any,
@@ -379,10 +409,8 @@ def is_pair_compatible(
     if id_a is not None and id_b is not None and id_a == id_b:
         return True
 
-    dept_a_enum = _normalize_dept_enum(getattr(req_a, "department", "TRACK"))
-    dept_b_enum = _normalize_dept_enum(getattr(req_b, "department", "TRACK"))
-    dept_a = dept_a_enum.value
-    dept_b = dept_b_enum.value
+    dept_a = _normalize_dept_enum(getattr(req_a, "department", "TRACK")).value
+    dept_b = _normalize_dept_enum(getattr(req_b, "department", "TRACK")).value
 
     act_a = str(getattr(req_a, "activity_type", "") or "").strip()
     act_b = str(getattr(req_b, "activity_type", "") or "").strip()
@@ -392,46 +420,16 @@ def is_pair_compatible(
         for rule in compatibility_rules:
             r_dept_a = _normalize_dept_enum(getattr(rule, "dept_a", "")).value
             r_dept_b = _normalize_dept_enum(getattr(rule, "dept_b", "")).value
-            r_act_a = str(getattr(rule, "activity_a", "") or "").strip().lower()
-            r_act_b = str(getattr(rule, "activity_b", "") or "").strip().lower()
+            r_act_a = str(getattr(rule, "activity_a", "") or "").strip()
+            r_act_b = str(getattr(rule, "activity_b", "") or "").strip()
             is_compat = bool(getattr(rule, "is_compatible", True))
 
-            # Match Forward (A -> A, B -> B)
-            if (
-                dept_a == r_dept_a
-                and act_a.lower() == r_act_a
-                and dept_b == r_dept_b
-                and act_b.lower() == r_act_b
-            ):
-                return is_compat
-
-            # Match Reverse (A -> B, B -> A)
-            if (
-                dept_a == r_dept_b
-                and act_a.lower() == r_act_b
-                and dept_b == r_dept_a
-                and act_b.lower() == r_act_a
-            ):
+            if _matches_rule(dept_a, act_a, dept_b, act_b, r_dept_a, r_act_a, r_dept_b, r_act_b, exact_match=True):
                 return is_compat
 
     # 2. Check built-in standard G&SR compatibility rules table
     for r_dept_a, r_act_a, r_dept_b, r_act_b, is_compat, _ in DEFAULT_GSR_RULES:
-        # Match Forward
-        if (
-            dept_a == r_dept_a
-            and (act_a.lower() == r_act_a.lower() or r_act_a.lower() in act_a.lower())
-            and dept_b == r_dept_b
-            and (act_b.lower() == r_act_b.lower() or r_act_b.lower() in act_b.lower())
-        ):
-            return is_compat
-
-        # Match Reverse
-        if (
-            dept_a == r_dept_b
-            and (act_a.lower() == r_act_b.lower() or r_act_b.lower() in act_a.lower())
-            and dept_b == r_dept_a
-            and (act_b.lower() == r_act_a.lower() or r_act_a.lower() in act_b.lower())
-        ):
+        if _matches_rule(dept_a, act_a, dept_b, act_b, r_dept_a, r_act_a, r_dept_b, r_act_b, exact_match=False):
             return is_compat
 
     # 3. Default safe assumption if no specific conflict registered
@@ -465,7 +463,8 @@ def are_spatially_compatible(
     """Check whether two requests occur within allowable spatial distance (<= 10 km).
 
     Requires both requests to belong to the same section, and their chainage distance
-    (if recorded in metadata) to not exceed max_spatial_km.
+    (if recorded in metadata) to not exceed max_spatial_km. Correctly normalizes
+    ascending and descending chainages.
     """
     sec_a = getattr(req_a, "section_id", None)
     sec_b = getattr(req_b, "section_id", None)
@@ -476,13 +475,13 @@ def are_spatially_compatible(
     s2, e2 = _get_chainage_range(req_b)
 
     if s1 is not None and e1 is not None and s2 is not None and e2 is not None:
-        # Compute spatial separation distance between the two chainage intervals
+        # Distance between intervals [s1, e1] and [s2, e2]
         if e1 < s2:
             dist = s2 - e1
         elif e2 < s1:
             dist = s1 - e2
         else:
-            dist = 0.0  # Overlapping chainage intervals
+            dist = 0.0  # Overlapping intervals
 
         if dist > max_spatial_km:
             return False
@@ -510,6 +509,26 @@ def are_traction_power_compatible(
     return True
 
 
+def _is_valid_clique(
+    combo: Sequence[Any],
+    compatibility_rules: Optional[Sequence[Any]] = None,
+    max_spatial_km: float = 10.0,
+) -> bool:
+    """Validate that a combination of requests satisfies spatial, power, and G&SR constraints."""
+    k = len(combo)
+    for i in range(k):
+        for j in range(i + 1, k):
+            req_i = combo[i]
+            req_j = combo[j]
+            if not are_spatially_compatible(req_i, req_j, max_spatial_km=max_spatial_km):
+                return False
+            if not are_traction_power_compatible(req_i, req_j):
+                return False
+            if not is_pair_compatible(req_i, req_j, compatibility_rules=compatibility_rules):
+                return False
+    return True
+
+
 # ── Core Clustering Engine ───────────────────────────────────
 
 
@@ -527,7 +546,6 @@ def _build_candidate_shadow_block(
         dur = int(getattr(r, "duration_minutes", 60))
         req_ci_pairs.append((r, ci, dur))
 
-    # Sort descending to pick primary
     sorted_pairs = sorted(
         req_ci_pairs,
         key=lambda item: (item[2], item[1], str(getattr(item[0], "request_code", ""))),
@@ -603,8 +621,14 @@ def _build_candidate_shadow_block(
         total_ci += ci
         total_durations += dur
 
-        # Internal flexible offset: align secondary activity inside primary window [0, primary_duration]
-        start_offset = 0
+        # Flexible offset scheduling: check preferred offset in metadata or align within [0, primary_duration]
+        meta = _get_metadata_dict(r)
+        preferred_start = meta.get("start_offset_minutes", meta.get("desired_offset_minutes", 0))
+        try:
+            start_offset = max(0, min(int(preferred_start), max(0, primary_duration - dur)))
+        except (ValueError, TypeError):
+            start_offset = 0
+
         end_offset = min(primary_duration, start_offset + dur)
 
         assignment = ShadowActivityAssignment(
@@ -656,25 +680,27 @@ def cluster_shadow_blocks(
     max_spatial_km: float = 10.0,
     target_date: Optional[date] = None,
     section_code_map: Optional[Dict[UUID, str]] = None,
+    max_cluster_size: int = 4,
 ) -> List[CandidateShadowBlock]:
     """Group pending maintenance requests into candidate Joint Shadow Blocks.
 
     Executes Stage 4 of the RailBlock Optimization Pipeline:
     1. Partitions requests by section.
     2. Generates standalone candidate blocks for each request.
-    3. Finds all mutually compatible 2-way and 3-way multi-department groupings
-       satisfying spatial distance (<= 10 km), traction power FP/SP boundary isolation,
-       and G&SR safety conflict rules.
+    3. Finds all mutually compatible multi-department groupings satisfying spatial
+       distance (<= 10 km), traction power FP/SP boundary isolation, and G&SR safety
+       conflict rules.
     4. Anchors the primary possession window by the primary activity and schedules
-       flexible internal start/end offsets for secondary shadow tasks.
+       flexible internal start/end offsets for secondary shadow activities.
     5. Calculates total aggregated Criticality Index and labor overlap hours saved.
 
     Args:
         requests: Sequence of pending MaintenanceRequest objects.
         compatibility_rules: Optional sequence of CompatibilityRule domain entities.
-        max_spatial_km: Maximum allowable chainage distance between bundled activities (default 10.0 km).
+        max_spatial_km: Maximum allowable chainage distance between activities (default 10.0 km).
         target_date: Target planning date for deadline and overdue calculations.
         section_code_map: Optional dictionary mapping section UUIDs to section code strings.
+        max_cluster_size: Maximum number of maintenance requests to bundle into a single Joint Shadow Block (default 4).
 
     Returns:
         List of candidate Joint Shadow Blocks sorted by priority and efficiency.
@@ -708,49 +734,18 @@ def cluster_shadow_blocks(
                 )
             )
 
-        # ── 2. Multi-Department Joint Bundling (Pairs and Triplets) ──
-        # Find all valid cliques of size 2 and 3
-        for k in (2, 3):
-            if n < k:
-                continue
-
+        # ── 2. Multi-Department Joint Grouping (Cliques of size 2 up to max_cluster_size) ──
+        max_k = min(n, max_cluster_size)
+        for k in range(2, max_k + 1):
             for combo in itertools.combinations(sec_reqs, k):
-                # Filter A: Spatial boundary check
-                spatially_valid = True
-                for i in range(k):
-                    for j in range(i + 1, k):
-                        if not are_spatially_compatible(combo[i], combo[j], max_spatial_km=max_spatial_km):
-                            spatially_valid = False
-                            break
-                    if not spatially_valid:
-                        break
-                if not spatially_valid:
-                    continue
-
-                # Filter B: Traction power isolation boundary check
-                power_valid = True
-                for i in range(k):
-                    for j in range(i + 1, k):
-                        if not are_traction_power_compatible(combo[i], combo[j]):
-                            power_valid = False
-                            break
-                    if not power_valid:
-                        break
-                if not power_valid:
-                    continue
-
-                # Filter C: G&SR safety compatibility clique check
-                if not is_cluster_compatible(combo, compatibility_rules=compatibility_rules):
-                    continue
-
-                # Valid Joint Shadow Block candidate
-                candidate_blocks.append(
-                    _build_candidate_shadow_block(
-                        cluster_requests=combo,
-                        target_date=target_date,
-                        section_code_map=section_code_map,
+                if _is_valid_clique(combo, compatibility_rules=compatibility_rules, max_spatial_km=max_spatial_km):
+                    candidate_blocks.append(
+                        _build_candidate_shadow_block(
+                            cluster_requests=combo,
+                            target_date=target_date,
+                            section_code_map=section_code_map,
+                        )
                     )
-                )
 
     # Sort candidate blocks by (total_criticality_index, is_joint_shadow_block, shadow_overlap_hours) descending
     candidate_blocks.sort(
