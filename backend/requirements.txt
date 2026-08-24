@@ -13,6 +13,9 @@ alembic==1.13.3
 python-dotenv==1.0.1
 python-multipart==0.0.12
 
+# ── Optimization Engine ───────────────────────────────
+ortools>=9.8.3296
+
 # ── Testing ───────────────────────────────────────────
 pytest==8.3.3
 pytest-asyncio==0.24.0

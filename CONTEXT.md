@@ -1,0 +1,79 @@
+# RailBlock: Automatic Block Planning Domain
+
+The domain language for AI-driven infrastructure maintenance possession scheduling, corridor capacity optimization, and safety rulebook compliance on Indian Railways.
+
+## Language
+
+### Infrastructure & Geography
+
+**Section**:
+A distinct physical railway track segment between two consecutive block stations.
+_Avoid_: Segment, stretch, track slice, rail chunk
+
+**Feeding Post (FP) / Sectioning Post (SP)**:
+A traction power substation switching installation that defines the electrical isolation boundaries for overhead equipment (OHE).
+_Avoid_: Power station, substation node, electrical grid point
+
+---
+
+### Traffic & Capacity
+
+**Corridor Gap**:
+A continuous time interval on a section during which no train movements occupy the track.
+_Avoid_: Free window, downtime slot, empty slot, track hole
+
+**Safety Buffer**:
+The statutory minimum time headway enforced before a train enters and after a train clears a section before maintenance possession can commence.
+_Avoid_: Padding, margin, clearance gap, headway buffer
+
+**Temporary Speed Restriction (TSR)**:
+A statutory caution order mandating reduced train velocity over a track section following physical maintenance work.
+_Avoid_: Slow zone, speed drop, speed limit
+
+**Single Line Working (SLW)**:
+An emergency operational protocol under G&SR where trains move bidirectionally over a single track when the parallel line is obstructed or overrunning.
+_Avoid_: Detour routing, single-track mode, bypass
+
+---
+
+### Maintenance & Possessions
+
+**Maintenance Request**:
+A formal requisition submitted by an engineering department (Track, Signal, or Traction) to inspect, repair, or renew physical assets.
+_Avoid_: Ticket, task, defect log, job requisition
+
+**Block**:
+An officially granted possession window during which all regular train traffic is halted on a section for maintenance work.
+_Avoid_: Closure, possession window, track freeze, rail blackout
+
+**Joint Shadow Block**:
+A consolidated block that executes multiple compatible maintenance requests from different departments concurrently within a single traffic closure.
+_Avoid_: Bundled block, co-block, multi-department block, piggyback block
+
+**Primary Block**:
+The anchor maintenance activity within a Joint Shadow Block whose duration and spatial limits define the overall track possession window.
+_Avoid_: Lead job, master block, main task
+
+**Shadow Activity**:
+A secondary, compatible maintenance task performed concurrently within the temporal and physical boundaries of a Primary Block.
+_Avoid_: Sub-task, child job, attached block, nested activity
+
+**Criticality Index (CI)**:
+A normalized score from 0 to 100 representing the urgency, safety hazard, and operational risk of an unresolved defect.
+_Avoid_: Priority score, severity rating, risk weight
+
+---
+
+### Statutory Operations & Safety
+
+**G&SR (General and Subsidiary Rules)**:
+The binding statutory operating rulebook of Indian Railways governing train operations, safety headways, and block regulations.
+_Avoid_: Rail policy, system rules, operating guidelines
+
+**Form T/351**:
+The statutory Indian Railways document exchanged between Station Masters and field engineers to officially authorize and close track disconnections.
+_Avoid_: Work permit, gate pass, job authorization
+
+**Private Number (PN)**:
+A confidential unique numeric token exchanged between the Station Master and Field Engineer to legally authenticate block grant and clearance.
+_Avoid_: Auth code, confirmation token, OTP, clearance PIN

@@ -29,3 +29,18 @@ from app.schemas.compatibility_rule import (
     CompatibilityRuleResponse,
 )
 from app.schemas.block import BlockResponse, BlockDetailResponse
+from app.schemas.optimizer import (
+    BDMSExportPayload,
+    BDMSShadowActivity,
+    CommitSimulationRequest,
+    CommitSimulationResponse,
+    ConflictingTrainImpact,
+    DetentionTierEnum,
+    FormT351NoticePayload,
+    OptimizerRunRequest,
+    OptimizerRunResponse,
+    ScheduledBlockJobSummary,
+    ScheduledBlockSummary,
+    WhatIfSimulationRequest,
+    WhatIfSimulationResponse,
+)
