@@ -51,6 +51,7 @@ class BlockStatusEnum(str, enum.Enum):
     APPROVED = "APPROVED"
     ACTIVE = "ACTIVE"
     COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
 
 
 class LineTypeEnum(str, enum.Enum):
