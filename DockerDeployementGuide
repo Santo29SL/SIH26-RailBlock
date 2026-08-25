@@ -1,0 +1,86 @@
+# 🐳 RailBlock — 1-Command Docker Setup & Testing Guide
+
+Yes, **RailBlock is 100% fully Dockerized!** 
+
+Anyone on your team (on **Mac, Windows, or Linux**) can run the entire system — including PostgreSQL database, Alembic migrations, FastAPI backend, Google OR-Tools optimizer, XGBoost + SHAP AI Risk Engine, WebSockets, and pgAdmin GUI — with **a single terminal command**.
+
+---
+
+## 🛠️ Step-by-Step Setup Guide (For You & Teammates)
+
+### Prerequisites:
+- **Docker Desktop** installed and running on the laptop. ([Download Docker](https://www.docker.com/products/docker-desktop/))
+
+---
+
+### Step 1: Clone / Open Project Directory
+Open your terminal (macOS/Linux) or PowerShell/Command Prompt (Windows) and navigate to the project root:
+```bash
+cd RailBlock
+```
+
+---
+
+### Step 2: Start the Entire Stack (1 Command)
+Run:
+```bash
+docker compose up --build -d
+```
+*What happens automatically:*
+1. Downloads PostgreSQL 15 & pgAdmin images.
+2. Builds the multi-stage Python 3.11 container with OR-Tools, XGBoost, and SHAP.
+3. Initializes database connection & health checks.
+4. Executes Alembic database migrations (`users` table, sections, train movements, etc.).
+5. Starts the FastAPI server on port `8000`.
+
+---
+
+### Step 3: Check Container Health
+To verify all 3 containers are running cleanly:
+```bash
+docker compose ps
+```
+You should see:
+- `railblock-backend` $\to$ **Running on port 8000**
+- `railblock-postgres` $\to$ **Healthy on port 5433 (internal 5432)**
+- `railblock-pgadmin` $\to$ **Running on port 5050**
+
+---
+
+### Step 4: Open & Test in Browser
+
+| Resource | URL | Credentials / Details |
+|---|---|---|
+| **Interactive API Docs (Swagger UI)** | [`http://localhost:8000/docs`](http://localhost:8000/docs) | Full interactive testing interface |
+| **API Health Check & DB Ping** | [`http://localhost:8000/health`](http://localhost:8000/health) | Returns `"database": "connected"` |
+| **pgAdmin Database GUI** | [`http://localhost:5050`](http://localhost:5050) | Email: `admin@railblock.local`<br>Password: `admin` |
+
+---
+
+### Step 5: Test the Core Features on Swagger UI (`http://localhost:8000/docs`)
+
+1. **Seed Demo Accounts:**
+   - Go to `POST /api/v1/auth/seed-users` $\to$ **Execute**.
+2. **Log In:**
+   - Go to `POST /api/v1/auth/login` $\to$ Username: `controller_ndls`, Password: `Password123!`.
+   - Copy `access_token` into the top-right **Authorize** button.
+3. **Test Stage 2 AI Risk Scoring:**
+   - Go to `POST /api/v1/risk/predict` $\to$ Execute payload $\to$ Returns dynamic Criticality Index ($0 \sim 100$) + SHAP XAI feature reasoning.
+4. **Test Stage 5 Google OR-Tools Optimizer:**
+   - Go to `POST /api/v1/optimizer/run` $\to$ Execute payload $\to$ Returns optimal joint shadow blocks.
+
+---
+
+### Step 6: Run Automated Tests Inside Docker (Optional Verification)
+To verify all 111 tests inside the container environment:
+```bash
+docker exec railblock-backend python -m pytest tests/ -v
+```
+
+---
+
+### Step 7: Stop the Stack When Done
+```bash
+docker compose down
+```
+*(Use `docker compose down -v` if you ever want to wipe the database clean and start fresh).*
