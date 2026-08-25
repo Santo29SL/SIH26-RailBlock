@@ -32,6 +32,8 @@ class Settings(BaseSettings):
 
     # ── Security ──────────────────────────────────────
     SECRET_KEY: str = "dev-secret-key-change-in-prod"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8 hours
 
     # ── CORS ──────────────────────────────────────────
     CORS_ORIGINS: List[str] = [

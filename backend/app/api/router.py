@@ -12,9 +12,16 @@ from app.api.resources import router as resources_router
 from app.api.compatibility import router as compatibility_router
 from app.api.blocks import router as blocks_router
 from app.api.optimizer import router as optimizer_router
+from app.api.risk_scoring import router as risk_scoring_router
+from app.api.auth import router as auth_router
+from app.api.ingestion import router as ingestion_router
+from app.api.events import router as events_router
 
 api_router = APIRouter()
 
+api_router.include_router(auth_router)
+api_router.include_router(ingestion_router)
+api_router.include_router(events_router)
 api_router.include_router(sections_router)
 api_router.include_router(maintenance_router)
 api_router.include_router(trains_router)
@@ -23,4 +30,5 @@ api_router.include_router(resources_router)
 api_router.include_router(compatibility_router)
 api_router.include_router(blocks_router)
 api_router.include_router(optimizer_router)
+api_router.include_router(risk_scoring_router)
 

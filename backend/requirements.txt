@@ -9,12 +9,33 @@ sqlalchemy[asyncio]==2.0.35
 asyncpg==0.29.0
 alembic==1.13.3
 
+# ── Security & Authentication ─────────────────────────
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+slowapi>=0.1.9
+structlog>=24.4.0
+
 # ── Utilities ─────────────────────────────────────────
 python-dotenv==1.0.1
 python-multipart==0.0.12
+email-validator>=2.0.0
 
 # ── Optimization Engine ───────────────────────────────
 ortools>=9.8.3296
+
+# ── Stage 2: AI/ML Criticality Scoring Engine ─────────
+# Gradient Boosted Trees for risk-based maintenance prioritization
+scikit-learn>=1.5.0
+xgboost>=2.1.0
+lightgbm>=4.4.0
+
+# Explainable AI — SHAP feature attribution for controller transparency
+shap>=0.46.0
+
+# Model serialization & scientific computing
+joblib>=1.4.0
+numpy>=1.26.0
+pandas>=2.2.0
 
 # ── Testing ───────────────────────────────────────────
 pytest==8.3.3

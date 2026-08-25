@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "RailBlock Database",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "railblock",
+      "Username": "postgres",
+      "SSLMode": "prefer"
+    }
+  }
+}
