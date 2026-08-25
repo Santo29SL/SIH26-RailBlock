@@ -60,10 +60,15 @@ services:
       PGADMIN_CONFIG_SERVER_MODE: "False"
     ports:
       - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./servers.json:/pgadmin4/servers.json
     depends_on:
       postgres:
         condition: service_healthy
 
 volumes:
   postgres_data:
+    driver: local
+  pgadmin_data:
     driver: local
