@@ -1,0 +1,299 @@
+# 🚆 RailBlock — Complete Beginner's Master Guide & Testing Manual (SIH PS 26027)
+
+This document is your **step-by-step guide** to understanding every module, algorithm, data structure, security layer, and API in the **RailBlock** backend. It includes copy-paste JSON payloads so you can test everything yourself on **Swagger UI (`http://localhost:8000/docs`)**.
+
+---
+
+## 1. High-Level Concept: What is RailBlock?
+
+Imagine a 100 km railway track between New Delhi and Kanpur. Every day:
+1. **Trains are running** (Passenger trains like Rajdhani, Vande Bharat, and Goods freight trains).
+2. **Maintenance is needed** by three separate departments:
+   - **Track Department (Engineering / TMS):** Needs to repair worn-out rails, inspect ultrasonic flaws (USFD), replace sleepers.
+   - **Signal Department (S&T / SMMS):** Needs to service point machines (track switchers), axle counters, and signals.
+   - **Traction Department (Electrical / TDMS):** Needs to inspect overhead high-voltage electric wires (OHE), clean insulators, tension wires.
+
+### The Old Problem:
+Each department would ask for a track closure (block) separately at different times of the day. This closed the track for 5.5 hours total, stopping trains multiple times!
+
+### The RailBlock AI Solution:
+RailBlock uses **AI Risk Scoring + Shadow Block Clustering + Google OR-Tools Mathematical Optimization** to combine compatible maintenance jobs from all three departments into a single 2.5-hour slot (saving up to 55% track downtime) during time gaps when no trains are running!
+
+---
+
+## 2. System Core Architecture & Data Flow
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│ STAGE 1: Legacy Data Ingestion (TMS, SMMS, TDMS)                      │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Raw Defect Telemetry
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ STAGE 2: AI Risk & Criticality Engine (XGBoost + SHAP XAI)            │
+│ Assigns Criticality Score (0-100) & SHAP Reason to each job            │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Rated Defect Jobs
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ STAGE 3: Corridor Capacity & Gap Extractor                            │
+│ Reads Train Timetable & finds free track gaps (≥ 15 min buffer)        │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Available Track Windows
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ STAGE 4: Multi-Department "Shadow Block" Clustering & G&SR Rules      │
+│ Bundles compatible nearby jobs (≤10km, matching power sub-stations)    │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Candidate Joint Shadow Blocks
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ STAGE 5: Google OR-Tools MILP Constraint Optimization Solver           │
+│ Assigns Joint Shadow Blocks to free gaps without stopping VIP trains   │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Optimal Block Schedule
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ STAGE 6 & 7: Rescheduler, WebSockets, Form T/351 & BDMS Exports       │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 3. Security, Authentication & Role-Based Access Control (RBAC)
+
+Before testing APIs, RailBlock enforces security:
+
+### Roles & Permissions:
+- **`ADMIN`:** Full access to all endpoints, configuration, and data management.
+- **`SECTION_CONTROLLER`:** Runs optimizer, approves/cancels blocks, triggers rescheduling.
+- **`STATION_MASTER`:** Validates statutory Form T/351 disconnection notices and issues Private Numbers.
+- **`DEPARTMENT_ENGINEER`:** Submits track (TMS), signal (SMMS), or traction (TDMS) defect requests.
+
+### Authentication Mechanism:
+- Passwords hashed using **bcrypt** (salted encryption).
+- Authentication uses **OAuth2 + JWT (JSON Web Tokens)**.
+- When you log in, you receive a signed `access_token`.
+- You attach this token to request headers as: `Authorization: Bearer <your_access_token>`.
+
+---
+
+## 4. Stage-by-Stage Detailed Breakdown & Swagger UI Testing Manual
+
+Open your browser and navigate to **[`http://localhost:8000/docs`](http://localhost:8000/docs)**.
+
+---
+
+### 🔑 AUTHENTICATION & LOGIN
+
+#### Step A: Seed Demo Accounts
+1. Scroll to **Authentication & Access Control**.
+2. Click `POST /api/v1/auth/seed-users`.
+3. Click **Try it out** $\to$ **Execute**.
+4. You will see: `"Successfully seeded 4 demo user accounts."`
+
+#### Step B: Login to Get JWT Access Token
+1. Click `POST /api/v1/auth/login`.
+2. Click **Try it out**.
+3. Fill in:
+   - `username`: `controller_ndls`
+   - `password`: `Password123!`
+4. Click **Execute**.
+5. Copy the long `access_token` string from the response!
+6. Click the green **Authorize** button at the top right of Swagger UI, paste the token into the `Value` box, and click **Authorize**. Now you are authenticated!
+
+---
+
+### 📍 STAGE 1: Legacy Data Ingestion (TMS, SMMS, TDMS)
+
+**Where is data stored?** In PostgreSQL tables (`maintenance_requests` and `sections`).
+
+#### Test 1: Ingest Track Defect from TMS
+1. Click `POST /api/v1/ingest/tms`.
+2. Click **Try it out**.
+3. Paste payload:
+```json
+{
+  "section_id": "79ab739f-27bb-45e7-9e84-3821b314aa3a",
+  "usfd_flaw_severity": 3,
+  "tgi_deviation": 88.5,
+  "chainage_km": 142.5,
+  "duration_minutes": 150
+}
+```
+4. Click **Execute**. Returns request code like `TMS-E8F0F8`.
+
+#### Test 2: Ingest Signal Defect from SMMS
+1. Click `POST /api/v1/ingest/smms`.
+2. Paste payload:
+```json
+{
+  "section_id": "79ab739f-27bb-45e7-9e84-3821b314aa3a",
+  "point_failure_risk": 82.0,
+  "station_code": "CNB",
+  "duration_minutes": 90
+}
+```
+3. Click **Execute**. Returns request code like `S&T-8D0D21`.
+
+#### Test 3: Ingest Traction Defect from TDMS
+1. Click `POST /api/v1/ingest/tdms`.
+2. Paste payload:
+```json
+{
+  "section_id": "79ab739f-27bb-45e7-9e84-3821b314aa3a",
+  "ohe_wear_pct": 75.0,
+  "feeding_post": "FP-CNB-01",
+  "duration_minutes": 120
+}
+```
+3. Click **Execute**. Returns request code like `TRD-673A8C`.
+
+---
+
+### 🧠 STAGE 2: AI Risk & Criticality Scoring Engine (XGBoost + SHAP XAI)
+
+**How it works:**
+- Takes defect telemetry (TGI deviation, speed restriction, days overdue, USFD flaw severity, GMT density).
+- Feeds vector into **XGBoost Regressor model**.
+- Uses **SHAP (SHapley Additive exPlanations)** to break down feature contributions.
+- Outputs dynamic Criticality Index ($0 \sim 100$) and human-readable explanation.
+
+#### Test Stage 2 AI Prediction:
+1. Scroll to **Stage 2 — AI Risk & Criticality Scoring**.
+2. Click `POST /api/v1/risk/predict`.
+3. Paste payload:
+```json
+{
+  "department": "TRACK",
+  "activity_type": "RAIL_RENEWAL",
+  "priority": "CRITICAL",
+  "metadata_json": {
+    "tgi_deviation": 88.5,
+    "speed_restriction_kmh": 30.0,
+    "usfd_flaw_severity": 3.0,
+    "days_overdue": 12,
+    "section_gmt_density": 85.0
+  }
+}
+```
+4. Click **Execute**.
+5. Response:
+```json
+{
+  "criticality_index": 91.5,
+  "model_used": "xgboost_shap_v1",
+  "shap_explanation": {
+    "base_value": 75.39,
+    "feature_attributions": {
+      "USFD Ultrasonic Rail Flaw": 18.53,
+      "Track Geometry Index (TGI) Deviation": 8.47,
+      "Traffic GMT Density": 2.05
+    },
+    "human_readable_reasoning": "Job rated 91.5/100 primarily driven by Track Geometry Index (TGI) Deviation (+8.5), Traffic GMT Density (+2.0), USFD Ultrasonic Rail Flaw (+18.5)."
+  }
+}
+```
+
+---
+
+### ⏱️ STAGE 3: Corridor Capacity & Gap Extraction
+
+**How it works:**
+- Reads scheduled `train_movements` for a section.
+- Orders train departure and arrival times chronologically.
+- Applies Indian Railways safety buffer ($\ge 15\text{ minutes}$ before and after each train).
+- Finds continuous idle track intervals where duration $\ge 60\text{ minutes}$.
+
+---
+
+### 🔗 STAGE 4: Multi-Department "Shadow Block" Clustering & G&SR Safety Rules
+
+**How it works:**
+1. **Spatial Radius Filter:** Groups pending defect requests located within $\le 10\text{ km}$.
+2. **Traction Substation Power Isolation Matching:** Maps OHE power demands to Feeding Posts (FP) / Sectioning Posts (SP) so power cuts don't kill adjacent running tracks.
+3. **Indian Railways G&SR Conflict Matrix:** Queries compatibility rules (e.g., disallows heavy track tamping machine work while S&T point machine testing is ongoing on the same chainage).
+4. Combines compatible requests into a single **Candidate Joint Shadow Block**.
+
+---
+
+### 🧮 STAGE 5: Google OR-Tools MILP Constraint Optimization Engine
+
+**How it works:**
+Uses **Google OR-Tools Mixed-Integer Linear Programming (MILP)** solver (`pywraplp`) to assign Joint Shadow Blocks to available corridor gaps.
+
+#### Hard Constraints (Must NEVER be violated):
+- $\sum \text{Train Occupancy} + \text{Block Possession} \le 1$ (Zero train-block collisions).
+- Protected slots for High-Priority passenger trains (Rajdhani / Vande Bharat).
+- Minimum continuous job duration.
+
+#### Objective Function:
+$$\max \sum (\text{CriticalityIndex} \times \text{Scheduled}) + \alpha \cdot \text{ShadowOverlapHours} - \beta \cdot \text{TrainDetentionMinutes}$$
+
+#### Test Stage 5 Optimizer Pipeline:
+1. Scroll to **Optimizer & Simulation Service**.
+2. Click `POST /api/v1/optimizer/run`.
+3. Paste payload:
+```json
+{
+  "section_id": "79ab739f-27bb-45e7-9e84-3821b314aa3a",
+  "target_date": "2026-08-25",
+  "persist_to_db": true
+}
+```
+4. Click **Execute**. Returns optimal scheduled joint shadow blocks!
+
+---
+
+### ⚡ STAGE 6: Real-time Dynamic Rescheduling & WebSockets
+
+**How it works:**
+- When a train is delayed $>20\text{ minutes}$, a fast greedy heuristic re-solves affected blocks in $<30\text{ seconds}$.
+- If a block overruns (e.g. tamping machine breakdown), it triggers the **Single Line Working (SLW)** state machine under G&SR Chapter 5/15 to route priority trains over the parallel line.
+- Broadcasts updates live via WebSocket endpoint (`ws://localhost:8000/api/v1/events/ws/telemetry`).
+
+---
+
+### 📑 STAGE 7: What-If Simulator & Statutory Export APIs
+
+#### 1. What-If Simulation with HMAC Commit Tokens
+- Controllers can test hypotheticals (*"What if I delay this block by 60 minutes?"*).
+- System returns predicted detention cost vs risk score.
+- Includes a tamper-proof **HMAC Commit Token** so the controller can instantly commit the plan without re-running the solver!
+
+#### Test What-If Simulator:
+1. Click `POST /api/v1/optimizer/simulate`.
+2. Paste payload:
+```json
+{
+  "section_id": "79ab739f-27bb-45e7-9e84-3821b314aa3a",
+  "target_date": "2026-08-25",
+  "proposed_start_time": "14:00:00",
+  "duration_minutes": 120
+}
+```
+3. Click **Execute**. Returns feasible window status + HMAC commit token.
+
+#### 2. Statutory Exports (Form T/351 & CRIS BDMS)
+- `GET /api/v1/blocks/{id}/export-bdms`: Export CRIS BDMS JSON payload.
+- `GET /api/v1/blocks/{id}/t351-notice`: Generates statutory **Form T/351 (Disconnection / Reconnection Notice)** with Private Numbers.
+
+---
+
+## 5. Summary Table of All Backend Endpoints
+
+| Stage / Module | Method | Endpoint URL | Description |
+|---|---|---|---|
+| **Auth** | `POST` | `/api/v1/auth/seed-users` | Seeds default Railway accounts |
+| **Auth** | `POST` | `/api/v1/auth/login` | Authenticates & returns JWT token |
+| **Auth** | `GET` | `/api/v1/auth/me` | Current user profile |
+| **Stage 1** | `POST` | `/api/v1/ingest/tms` | Ingest Track defect |
+| **Stage 1** | `POST` | `/api/v1/ingest/smms` | Ingest Signal defect |
+| **Stage 1** | `POST` | `/api/v1/ingest/tdms` | Ingest Traction defect |
+| **Stage 2** | `POST` | `/api/v1/risk/predict` | XGBoost + SHAP Risk prediction |
+| **Stage 2** | `GET` | `/api/v1/risk/model-info` | Model status & features |
+| **Stage 5** | `POST` | `/api/v1/optimizer/run` | Runs Google OR-Tools solver |
+| **Stage 6** | `WS` | `/api/v1/events/ws/telemetry` | Live WebSocket event stream |
+| **Stage 7** | `POST` | `/api/v1/optimizer/simulate` | What-If simulation engine |
+| **Stage 7** | `GET` | `/api/v1/blocks/{id}/t351-notice` | Form T/351 Statutory Notice |
+| **Stage 7** | `GET` | `/api/v1/blocks/{id}/export-bdms` | CRIS BDMS payload export |
