@@ -1,0 +1,29 @@
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Large raw data files (seeded via API or volume mount)
+data/raw/trains/*.json
+data/raw/stations/*.csv
+data/raw/datameet/*.json
+
+# Test artifacts
+htmlcov/
+.coverage
+
+# Docker
+Dockerfile
+.dockerignore

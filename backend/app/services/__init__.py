@@ -19,6 +19,7 @@ from app.services.optimizer import (
     run_optimization_pipeline,
     solve_block_schedule,
 )
+from app.services.ml_risk_engine import RiskScoringEngine, risk_engine
 from app.services.rescheduler import (
     RescheduleAction,
     RescheduleOutcome,
@@ -52,6 +53,7 @@ __all__ = [
     "apply_greedy_time_shift",
     "format_slw_advisory_text",
     "generate_slw_advisory",
-    "reschedule_on_disruption",
+    "RiskScoringEngine",
+    "risk_engine",
 ]
 

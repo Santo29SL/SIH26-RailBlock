@@ -1,4 +1,5 @@
 services:
+  # ── PostgreSQL Database ─────────────────────────────
   postgres:
     image: postgres:15-alpine
     container_name: railblock-postgres
@@ -17,6 +18,38 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── FastAPI Backend ─────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: railblock-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/railblock
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: railblock
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      BACKEND_HOST: 0.0.0.0
+      BACKEND_PORT: 8000
+      DEBUG: "true"
+      SECRET_KEY: dev-secret-key-change-in-prod
+      CORS_ORIGINS: '["http://localhost:5173","http://localhost:3000"]'
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  # ── pgAdmin (DB GUI) ───────────────────────────────
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: railblock-pgadmin

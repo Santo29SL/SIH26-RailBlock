@@ -8,6 +8,7 @@ from app.models.resource import Resource
 from app.models.compatibility_rule import CompatibilityRule
 from app.models.block import Block
 from app.models.block_job import BlockJob
+from app.models.user import User, UserRole
 
 __all__ = [
     "Section",
@@ -18,4 +19,6 @@ __all__ = [
     "CompatibilityRule",
     "Block",
     "BlockJob",
+    "User",
+    "UserRole",
 ]
