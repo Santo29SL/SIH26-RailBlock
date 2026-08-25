@@ -1,784 +1,221 @@
-# 🚆 AI-Powered Railway Maintenance Block Planner
-
-An AI-assisted railway maintenance scheduling system designed to **automatically coordinate maintenance activities across Track, Signalling, and Traction departments while minimizing disruption to train operations**.
-
-> **SIH Problem Statement:** AI-Powered Automatic Block Planning to Maximize Asset Availability for Train Operations on Indian Railways
+# 🚆 RailBlock — AI-Powered Automatic Block Planning System
+### Smart India Hackathon 2026 | Problem Statement 26027
+**Organization:** Ministry of Railways (CRIS / RDSO)  
+**Theme:** Transportation & Logistics | **Category:** Software  
 
 ---
 
-## 📌 Overview
+## 📌 Executive Summary
 
-Railway infrastructure requires regular maintenance of:
+Railway infrastructure maintenance across Indian Railways operates across three distinct engineering divisions:
+* **Civil Engineering (Tracks & Rails):** Track Management System (TMS)
+* **Signal & Telecom (S&T):** Signalling Maintenance & Management System (SMMS)
+* **Traction Distribution (TRD / Electrical):** Traction Distribution Management System (TDMS)
 
-* 🛤️ Tracks and rails
-* 🚦 Signalling systems
-* ⚡ Traction/OHE infrastructure
+Independent departmental corridor possessions cause repeated solo track closures, passenger train detentions, and diminished network capacity.
 
-Different departments may independently request maintenance blocks for the same railway section. This can result in unnecessary blocks, increased asset downtime, and disruption to train operations.
+**RailBlock** is a centralized decision-support and constraint-optimization platform that coordinates multi-departmental maintenance requests, identifies continuous traffic downtime gaps, bundles compatible tasks into **Joint Shadow Blocks**, and solves optimal schedules using **Google OR-Tools Mixed-Integer Linear Programming (MILP)** while strictly enforcing **G&SR statutory safety rules** and protecting high-priority passenger corridors (Rajdhani, Vande Bharat).
 
-This project proposes a centralized intelligent system that combines maintenance requests with railway network and train movement data to generate an **optimized maintenance-block schedule**.
+---
 
-### Core idea
+## 🏗️ System Architecture & Pipeline
 
-```text
-Maintenance Data
-       +
-Train Movement Data
-       +
-Railway Network
-       +
-Maintenance Constraints
-       ↓
-AI / Optimization Engine
-       ↓
-Optimal Maintenance Blocks
-       ↓
-Minimum Train Disruption
+```mermaid
+flowchart LR
+    TMS[Track Defect Data<br/>TGI, USFD Flaws] --> STAGE2
+    SMMS[Signal Health Logs<br/>Points, Axle Counters] --> STAGE2
+    TDMS[Traction OHE Data<br/>Wire Wear, FP/SP Zones] --> STAGE2
+
+    subgraph STAGE2 ["Stage 2: AI Risk Scoring Engine"]
+        XGB[XGBoost / LightGBM Regressor] --> CI[Criticality Index: 0-100]
+        XGB --> SHAP[SHAP Feature Attribution]
+    end
+
+    COA[COA Timetables<br/>8,000+ Real IR Trains] --> STAGE3[Stage 3: Gap Extractor<br/>≥15 min Safety Buffers]
+
+    STAGE2 --> STAGE4[Stage 4: Shadow Clustering<br/>G&SR Safety Matrix & ≤10km Bounds]
+    STAGE3 --> STAGE4
+
+    STAGE4 --> STAGE5[Stage 5: Google OR-Tools MILP<br/>Tier-1 VIP Zero-Detention Solver]
+
+    LIVE[Live Delay Telemetry<br/>Delays > 20 min] --> STAGE6[Stage 6: Fast Rescheduler<br/>Sub-second Shift & SLW Protocol]
+
+    STAGE5 --> STAGE7[Stage 7: Control Office Dashboard<br/>Dual Gantt, GIS Map, Form T/351, CRIS BDMS]
+    STAGE6 --> STAGE7
 ```
 
 ---
 
-## 🎯 Objectives
+## ⚡ Key System Capabilities
 
-The system aims to:
-
-* Coordinate maintenance requests from multiple departments.
-* Identify maintenance activities that can potentially be grouped.
-* Find suitable maintenance windows based on train traffic.
-* Respect maintenance deadlines and durations.
-* Consider resource and compatibility constraints.
-* Minimize train disruption.
-* Minimize unnecessary maintenance blocks.
-* Reduce asset downtime.
-* Maximize railway infrastructure availability.
-
----
-
-## 🏗️ System Architecture
-
-```text
-                  ┌─────────────────────┐
-                  │    Railway Data     │
-                  │                     │
-                  │ TMS / SMMS / TDMS   │
-                  │ Train Timetable     │
-                  │ Railway Network     │
-                  └──────────┬──────────┘
-                             │
-                             ▼
-                  ┌─────────────────────┐
-                  │   Apache Airflow    │
-                  │  Workflow Pipeline  │
-                  └──────────┬──────────┘
-                             │
-                             ▼
-                  ┌─────────────────────┐
-                  │   Data Processing   │
-                  │  Pandas / Python    │
-                  └──────────┬──────────┘
-                             │
-                             ▼
-                  ┌─────────────────────┐
-                  │   ML Prediction     │
-                  │ Train Impact/Risk   │
-                  └──────────┬──────────┘
-                             │
-                             ▼
-                  ┌─────────────────────┐
-                  │   OR-Tools          │
-                  │ Optimization Engine │
-                  └──────────┬──────────┘
-                             │
-                             ▼
-                  ┌─────────────────────┐
-                  │     PostgreSQL      │
-                  │      Database       │
-                  └──────────┬──────────┘
-                             │
-                             ▼
-                  ┌─────────────────────┐
-                  │      FastAPI        │
-                  │     Backend API     │
-                  └──────────┬──────────┘
-                             │
-                             ▼
-                  ┌─────────────────────┐
-                  │    React Frontend   │
-                  │ Dashboard / Map /   │
-                  │ Gantt / Analytics   │
-                  └─────────────────────┘
-```
+* **Stage 1 — Multi-System Data Ingestion & Legacy Adapters:** Ingests TMS (Track flaws & TGI), SMMS (Point machines & axle counters), TDMS (OHE wire wear & power zones), and COA (Timetables) via structured edge adapters.
+* **Stage 2 — AI Risk & Criticality Scoring Engine:** Predicts dynamic Criticality Index ($CI \in [0, 100]$) using Gradient Boosted Trees (`XGBoost` / `LightGBM`) with SHAP explainability for Section Controllers.
+* **Stage 3 — Corridor Gap & Headway Extractor:** Automatically extracts continuous unoccupied track windows ($\ge 60\text{ min}$) with mandatory statutory **$\ge 15\text{ min}$ safety headways** and continuous rolling midnight stitching.
+* **Stage 4 — Joint Shadow Block Clustering:** Bundles multi-department tasks occurring within $\le 10\text{ km}$ spatial bounds and Substation Feeding Post (FP) / Sectioning Post (SP) power zones ($40\text{--}80\text{ km}$), strictly enforcing the **G&SR Safety Conflict Matrix** to prevent dangerous concurrent work (e.g. tamping vs. point testing).
+* **Stage 5 — Google OR-Tools MILP Solver:** Space-Time CP-SAT constraint optimization enforcing **hard zero-detention constraints for Tier 1 VIP trains (Rajdhani, Vande Bharat)**, machine resource limits (Tamping Machines, Tower Wagons), and multi-objective score maximization.
+* **Stage 6 — Real-Time Fast Rescheduler & SLW Fallback:** Sub-millisecond greedy time-shifting for live train delays $> 20\text{ min}$, and automatic **G&SR Chapter 5/15 Single Line Working (SLW)** emergency advisory generation on block overruns.
+* **Stage 7 — Statutory Form T/351 & CRIS BDMS Exporters:** Enforces digital Station Master **Private Number (PN)** exchanges for track disconnection/reconnection and exports draft possession requests in official **CRIS BDMS JSON format**.
+* **Security & Access Control:** JWT authentication with 7 role-based access control tiers (`ADMIN`, `CONTROLLER`, `STATION_MASTER`, `ENGINEER_TRACK`, `ENGINEER_SIGNAL`, `ENGINEER_TRACTION`, `VIEWER`).
 
 ---
 
 ## 🧩 Technology Stack
 
-| Component              | Technology        |
-| ---------------------- | ----------------- |
-| Backend                | Python, FastAPI   |
-| Database               | PostgreSQL        |
-| Data Processing        | Pandas, NumPy     |
-| Optimization           | Google OR-Tools   |
-| Machine Learning       | Scikit-learn      |
-| Workflow Orchestration | Apache Airflow    |
-| Frontend               | React             |
-| Visualization          | Recharts          |
-| Maps                   | Leaflet           |
-| Containerization       | Docker            |
-| API Documentation      | OpenAPI / Swagger |
+| Layer | Technologies Used | Responsibility |
+| :--- | :--- | :--- |
+| **Backend Core** | Python 3.12, FastAPI, Pydantic v2, `uv` | High-performance asynchronous REST APIs & business logic |
+| **Optimization Solver** | Google OR-Tools (CP-SAT MILP) | Space-time block scheduling & capacity constraint solver |
+| **AI / ML Risk Scoring** | XGBoost, LightGBM, Scikit-learn, SHAP | Dynamic Criticality Index ($CI \in [0, 100]$) & XAI explainability |
+| **Database & ORM** | PostgreSQL 15, SQLAlchemy 2.0 (Async), Alembic | Relational data models, migrations, and seed repository |
+| **Frontend UI (WIP)** | React (v18+), Vite, TypeScript, TailwindCSS, Leaflet, D3 | Control Office Dual-Swimlane Gantt, GIS Map & What-If Slider UI |
+| **Real-time Telemetry** | Server-Sent Events (SSE), WebSockets | Real-time live train delay broadcasts & disruption alerts |
+| **Containerization** | Docker, Docker Compose, pgAdmin 4 | Production container orchestration & database management |
 
 ---
 
 ## 📂 Project Structure
 
 ```text
-railway-block-planner/
-│
+SIH26-RailBlock/
 ├── backend/
+│   ├── alembic/                 # Database migrations (Alembic)
 │   ├── app/
-│   │   ├── core/
-│   │   ├── models/
-│   │   ├── schemas/
-│   │   ├── api/
-│   │   └── services/
-│   │
-│   ├── tests/
-│   └── requirements.txt
+│   │   ├── api/                 # FastAPI Route Routers (auth, blocks, optimizer, risk, events)
+│   │   ├── core/                # App config, database session, JWT security, permissions
+│   │   ├── models/              # SQLAlchemy 2.0 async database models (9 tables)
+│   │   ├── schemas/             # Pydantic v2 validation & response schemas
+│   │   ├── services/            # Pure computational engines (gap_extractor, clustering, optimizer, rescheduler)
+│   │   └── main.py              # Application factory, rate limiting & logging middleware
+│   ├── data/
+│   │   ├── raw/                 # Real IR Open Data: 8,990 Stations & 8,000+ Trains
+│   │   ├── ml_models/           # Exported XGBoost model weights (.joblib)
+│   │   └── seed_all.py          # Database seeder for stations, trains, rules, and requests
+│   ├── tests/                   # Automated Unit and Integration tests (pytest)
+│   ├── Dockerfile               # Production multi-stage Docker container
+│   ├── entrypoint.sh            # Auto migration + seed + startup script
+│   └── requirements.txt         # Production Python dependencies
 │
-├── data/
-│   ├── raw/
-│   ├── processed/
-│   └── synthetic/
+├── ml/                          # Dedicated AI/ML Workspace (Offline Training & Explainer)
+│   ├── data/                    # Dataset storage & generator
+│   └── models/                  # Offline model checkpoints
 │
-├── ml/
-│   ├── notebooks/
-│   ├── models/
-│   └── scripts/
-│
-├── airflow/
-│   ├── dags/
-│   └── plugins/
-│
-├── frontend/
+├── frontend/                    # React + Vite + TailwindCSS SPA (Control Office Dashboard)
 │
 ├── docs/
+│   ├── adr/                     # 6 Architectural Decision Records (ADRs)
+│   └── core/                    # System specifications for Backend Core, AI/ML, and Frontend
 │
-├── docker-compose.yml
-├── .env.example
-├── .gitignore
-└── README.md
+├── CONTEXT.md                   # Canonical Railway Domain Glossary
+├── docker-compose.yml           # Multi-container orchestration (Postgres, pgAdmin, Backend)
+└── README.md                    # Main documentation
 ```
 
 ---
 
-## 🔄 How It Works
+## 🚀 Quickstart & Local Setup
 
-### 1. Maintenance Requests
-
-The system receives maintenance requirements from different railway departments.
-
-Example:
-
-```text
-M001
-Department: Track
-Section: SEC_A
-Duration: 120 minutes
-Priority: HIGH
-Deadline: 28-Aug-2026
-```
-
-```text
-M002
-Department: Signal
-Section: SEC_A
-Duration: 60 minutes
-Priority: MEDIUM
-Deadline: 28-Aug-2026
-```
-
-```text
-M003
-Department: Traction
-Section: SEC_A
-Duration: 120 minutes
-Priority: HIGH
-Deadline: 29-Aug-2026
-```
+### Prerequisites
+* **Python 3.12+**
+* **[`uv`](https://github.com/astral-sh/uv)** (Fast Python package manager)
+* **Docker & Docker Compose**
 
 ---
 
-### 2. Data Integration
-
-Maintenance requests from Track, Signalling, and Traction systems are converted into a common structure.
-
-```text
-TMS  ─────┐
-          │
-SMMS ─────┼──→ Unified Maintenance Data
-          │
-TDMS ─────┘
-```
-
----
-
-### 3. Train Impact Calculation
-
-The system checks train movements for the affected railway section.
-
-For example:
-
-```text
-SEC_A
-
-10:00 → Train 1
-10:20 → Train 2
-10:40 → Train 3
-
-14:00 → Train 4
-15:00 → Train 5
-```
-
-A block from:
-
-```text
-10:00 – 12:00
-```
-
-would have greater operational impact than:
-
-```text
-14:00 – 16:00
-```
-
-if the latter period has fewer train movements.
-
----
-
-### 4. Maintenance Grouping
-
-The system identifies maintenance activities that occur on the same section and can potentially be performed together.
-
-```text
-SEC_A
-│
-├── Track Repair
-├── Signal Inspection
-└── OHE Maintenance
-```
-
-Compatible jobs may be grouped into a common block subject to configured constraints.
-
----
-
-### 5. Optimization
-
-Google OR-Tools is used to find an efficient schedule.
-
-The optimizer considers:
-
-* Maintenance duration
-* Deadlines
-* Train traffic
-* Number of blocks
-* Resource availability
-* Maintenance compatibility
-* Asset downtime
-
-The objective is to minimize the overall operational cost.
-
-Conceptually:
-
-```text
-Total Cost =
-
-Train Disruption
-+ Maintenance Delay
-+ Number of Blocks
-+ Asset Downtime
-```
-
----
-
-### 6. Recommended Block
-
-The system generates a recommendation such as:
-
-```text
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-     RECOMMENDED BLOCK
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Section: SEC_A
-
-Time:
-14:00 – 16:00
-
-Maintenance:
-✓ Track Repair
-✓ Signal Inspection
-✓ OHE Inspection
-
-Train Impact:
-LOW
-
-Maintenance Jobs:
-3
-
-Status:
-RECOMMENDED
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
-
----
-
-# 🤖 AI / ML Component
-
-Machine learning will be used as an additional prediction layer.
-
-Potential features include:
-
-* Railway section
-* Time of day
-* Day of week
-* Number of trains
-* Train type
-* Historical delay
-* Maintenance duration
-* Block duration
-
-The model can estimate:
-
-```text
-Expected Train Delay
-        ↓
-Expected Operational Impact
-```
-
-This prediction can then be supplied to the optimization engine.
-
-### ML Pipeline
-
-```text
-Historical Data
-      ↓
-Data Cleaning
-      ↓
-Feature Engineering
-      ↓
-ML Model
-      ↓
-Impact Prediction
-      ↓
-OR-Tools Optimizer
-```
-
-Initial models may include:
-
-* Random Forest
-* Gradient Boosting
-
----
-
-# 🔄 Apache Airflow
-
-Apache Airflow will orchestrate the complete data pipeline.
-
-Airflow is **not the optimization algorithm**.
-
-Its responsibility is to execute and monitor the workflow.
-
-```text
-Fetch Data
-    ↓
-Validate Data
-    ↓
-Clean Data
-    ↓
-Transform Data
-    ↓
-Feature Engineering
-    ↓
-ML Prediction
-    ↓
-Run Optimizer
-    ↓
-Save Results
-```
-
-### Responsibilities
-
-| Component    | Responsibility         |
-| ------------ | ---------------------- |
-| Airflow      | Workflow orchestration |
-| Pandas       | Data processing        |
-| Scikit-learn | Prediction             |
-| OR-Tools     | Optimization           |
-| PostgreSQL   | Data storage           |
-| FastAPI      | Backend/API            |
-| React        | Visualization          |
-
----
-
-# 🗄️ Database
-
-The initial PostgreSQL database will contain tables such as:
-
-```text
-sections
-maintenance_requests
-trains
-train_movements
-resources
-compatibility_rules
-blocks
-block_jobs
-```
-
-### Example relationship
-
-```text
-Section
-   │
-   ├── Maintenance Request
-   │
-   ├── Train Movement
-   │
-   └── Maintenance Block
-```
-
----
-
-# 📊 Data Sources
-
-The project will combine multiple types of data.
-
-### Indian Railway Open Data
-
-Public railway datasets can be used for:
-
-* Train timetables
-* Railway stations
-* Railway network information
-* Train operating statistics
-
-### Maintenance / Research Datasets
-
-Public railway maintenance and track-defect datasets can be used for experimentation and ML.
-
-### Synthetic TMS / SMMS / TDMS Data
-
-Actual department-level TMS/SMMS/TDMS operational data is not expected to be publicly available.
-
-Therefore, the prototype will generate synthetic maintenance records following the expected structure of these systems.
-
-> Synthetic data will be clearly identified as synthetic and will not be represented as actual Indian Railways operational data.
-
----
-
-# 🚀 Development Roadmap
-
-### Phase 1 — Backend
-
-* [x] Define project architecture
-* [ ] Setup GitHub repository
-* [ ] Setup PostgreSQL
-* [ ] Setup FastAPI
-* [ ] Create database models
-* [ ] Create CRUD APIs
-
-### Phase 2 — Optimization
-
-* [ ] Build train impact engine
-* [ ] Build maintenance grouping
-* [ ] Add deadline constraints
-* [ ] Add compatibility rules
-* [ ] Integrate OR-Tools
-* [ ] Generate optimized blocks
-* [ ] Add optimization API
-
-### Phase 3 — Machine Learning
-
-* [ ] Prepare training data
-* [ ] Feature engineering
-* [ ] Train impact prediction model
-* [ ] Evaluate model
-* [ ] Integrate ML with optimizer
-
-### Phase 4 — Airflow
-
-* [ ] Setup Airflow
-* [ ] Create ingestion DAG
-* [ ] Create preprocessing tasks
-* [ ] Add ML task
-* [ ] Add optimization task
-* [ ] Store generated schedules
-
-### Phase 5 — Frontend
-
-* [ ] Setup React
-* [ ] Dashboard
-* [ ] Maintenance management
-* [ ] Railway map
-* [ ] Gantt chart
-* [ ] Optimization results
-* [ ] What-if simulation
-
-### Phase 6 — Final Integration
-
-* [ ] Backend + ML integration
-* [ ] Airflow + backend integration
-* [ ] Frontend + API integration
-* [ ] Testing
-* [ ] Performance testing
-* [ ] Documentation
-* [ ] Final demo
-
----
-
-# 🛠️ Local Development
-
-## Requirements
-
-Install:
-
-* Python 3.11+
-* Docker Desktop
-* Git
-* Node.js (for frontend, later)
-
----
-
-## Clone Repository
+### Step 1: Clone the Repository & Configure Environment
 
 ```bash
-git clone <repository-url>
-cd railway-block-planner
+git clone https://github.com/Santo29SL/SIH26-RailBlock.git
+cd SIH26-RailBlock
+
+# Copy environment variables
+cp .env.example .env
 ```
 
 ---
 
-## Start PostgreSQL
+### Step 2: Start PostgreSQL & pgAdmin + Dependencies in Docker
 
 ```bash
-docker compose up -d
+docker compose up -d 
 ```
+* **PostgreSQL:** `localhost:5433` (Database: `railblock`, User: `postgres`, Password: `postgres`)
+* **pgAdmin:** `http://localhost:5050` (Email: `admin@railblock.dev`, Password: `admin`)
 
 ---
 
-## Backend Setup
-
-### macOS / Linux
+### Step 3: Install Backend Dependencies & Run Migrations
 
 ```bash
 cd backend
 
-python3 -m venv .venv
-source .venv/bin/activate
+# 1. Create virtual environment & install dependencies using uv
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+uv pip install -r requirements.txt
 
-pip install -r requirements.txt
-```
+# 2. Run database migrations
+uv run alembic upgrade head
 
-### Windows
-
-```powershell
-cd backend
-
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-
-pip install -r requirements.txt
+# 3. Seed real Indian Railways stations (8.9k), trains (8k+), and maintenance requests
+uv run python -m data.seed_all
 ```
 
 ---
 
-## Environment Variables
-
-Create a `.env` file based on `.env.example`.
-
-Example:
-
-```env
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/railway_planner
-API_HOST=127.0.0.1
-API_PORT=8000
-```
-
-> `.env` should never be committed to GitHub.
-
----
-
-## Run FastAPI
-
-From the `backend` directory:
+### Step 4: Launch the FastAPI Backend Server
 
 ```bash
-uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload --port 8000
 ```
 
-Backend:
-
-```text
-http://localhost:8000
-```
-
-Interactive API documentation:
-
-```text
-http://localhost:8000/docs
-```
+* **Backend API:** `http://localhost:8000`
+* **Interactive Swagger API Documentation:** `http://localhost:8000/docs`
+* **ReDoc Documentation:** `http://localhost:8000/redoc`
 
 ---
 
-# 🌿 Git Workflow
+## 📑 Core API Reference
 
-The project uses feature branches.
-
-```text
-main
- │
- └── develop
-      │
-      ├── feature/backend
-      ├── feature/optimizer
-      ├── feature/ml
-      ├── feature/airflow
-      └── feature/frontend
-```
-
-Create a feature branch:
-
-```bash
-git checkout -b feature/backend
-```
-
-Commit changes:
-
-```bash
-git add .
-git commit -m "feat: add maintenance API"
-```
-
-Push:
-
-```bash
-git push -u origin feature/backend
-```
-
-Create a Pull Request into `develop`.
+| Endpoint | Method | Description |
+| :--- | :---: | :--- |
+| `/api/v1/auth/login` | `POST` | Authenticate user & receive JWT access + refresh tokens |
+| `/api/v1/sections` | `GET` | Retrieve list of railway sections with station markers |
+| `/api/v1/train-movements` | `GET` | List timetabled train movements on a specific section |
+| `/api/v1/maintenance` | `GET` | List pending maintenance requests across Track, Signal, and Traction |
+| `/api/v1/optimizer/run` | `POST` | Execute Stage 3 $\to$ 4 $\to$ 5 solver and persist scheduled blocks |
+| `/api/v1/optimizer/simulate` | `POST` | Pure in-memory What-If scenario simulation with HMAC commit token |
+| `/api/v1/optimizer/commit-simulation` | `POST` | Commit simulated schedule to DB using verified HMAC token |
+| `/api/v1/blocks/{id}/transition` | `POST` | Form T/351 Private Number exchange state machine transition |
+| `/api/v1/blocks/{id}/export-bdms` | `GET` | Export approved block in official CRIS BDMS draft JSON format |
+| `/api/v1/blocks/{id}/t351-notice` | `GET` | Export statutory Form T/351 Disconnection Notice payload |
+| `/api/v1/risk/score` | `POST` | Predict Criticality Index ($CI \in [0, 100]$) and SHAP factor attribution |
+| `/api/v1/events/telemetry` | `GET` | Server-Sent Events (SSE) live train delay broadcast stream |
 
 ---
 
-# 🧪 Testing
+## 👥 System Workstreams & Architecture Modules
 
-Tests will be written using `pytest`.
-
-Run:
-
-```bash
-pytest
-```
-
-Important test cases include:
-
-```text
-✓ Maintenance duration is respected
-✓ Deadlines are not violated
-✓ Incompatible jobs are not grouped
-✓ Resource conflicts are avoided
-✓ Correct railway section is selected
-✓ Train impact is calculated correctly
-✓ Optimizer selects a lower-impact valid schedule
-```
+| Module / Workstream | Functional Focus | Deliverables & Scope |
+| :--- | :--- | :--- |
+| **Backend Core & Optimization** | Space-Time Planning & Scheduling | Gap Extractor, Shadow Block Clustering, Google OR-Tools Solver, Rescheduler, Form T/351 & BDMS APIs |
+| **AI / ML & Explainability** | Risk Prioritization & Explainable AI | Stage 2 XGBoost/LightGBM Criticality Index model ($CI \in [0, 100]$) & SHAP controller reasoning |
+| **Frontend & Middleware** | Control Office Visualization & Integration | Control Office Dashboard (React/Vite), Dual-Swimlane Gantt, Leaflet GIS Map, What-If Slider UI |
 
 ---
 
-# 🔐 Safety and Data Disclaimer
+## 📜 Architectural Decision Records (ADRs)
 
-This is a **research and hackathon prototype**.
-
-The generated schedules are simulations and must not be used for real railway operations.
-
-A production railway deployment would require:
-
-* Official railway operational data
-* Validated infrastructure information
-* Official maintenance rules
-* Railway-approved safety constraints
-* Real-time operational integration
-* Extensive testing and validation
-* Authorization from the appropriate railway authorities
+Key architectural decisions are documented under [`docs/adr/`](file:///home/aadith/SIH/RailBlock-Aadith/docs/adr/):
+* [`ADR 0001: Two-Tier Optimization Architecture (Offline MILP + Real-Time Greedy Heuristic)`](file:///home/aadith/SIH/RailBlock-Aadith/docs/adr/0001-two-tier-optimization-architecture.md)
+* [`ADR 0002: Read-Only Edge Gateway & RailNet Air-Gap Security`](file:///home/aadith/SIH/RailBlock-Aadith/docs/adr/0002-read-only-edge-gateway-air-gap.md)
+* [`ADR 0003: Tiered Train Detention & Zero-Tolerance VIP Timetable Protection`](file:///home/aadith/SIH/RailBlock-Aadith/docs/adr/0003-tiered-train-detention-and-priority-protection.md)
+* [`ADR 0004: Directional Track Possession & Flexible Internal Shadow Offsets`](file:///home/aadith/SIH/RailBlock-Aadith/docs/adr/0004-directional-possession-and-flexible-shadow-windows.md)
+* [`ADR 0005: Statutory Block Lifecycle & Station Master Private Number State Machine`](file:///home/aadith/SIH/RailBlock-Aadith/docs/adr/0005-statutory-block-lifecycle-and-private-number-state-machine.md)
+* [`ADR 0006: In-Memory What-If Simulation with HMAC Commit Tokens`](file:///home/aadith/SIH/RailBlock-Aadith/docs/adr/0006-in-memory-what-if-simulation-with-commit-tokens.md)
 
 ---
 
-# 👥 Team Development
+## ⚖️ License & Compliance Disclaimer
 
-The project is designed for collaborative development.
-
-Suggested responsibilities:
-
-| Area         | Responsibility                   |
-| ------------ | -------------------------------- |
-| Backend      | FastAPI, PostgreSQL, APIs        |
-| Optimization | OR-Tools, scheduling constraints |
-| Data / ML    | Datasets, preprocessing, ML      |
-| Airflow      | Pipeline orchestration           |
-| Frontend     | React, map, dashboard, Gantt     |
-
----
-
-# 📌 Current Status
-
-🚧 **Project under active development**
-
-The current focus is on:
-
-```text
-PostgreSQL
-    ↓
-FastAPI
-    ↓
-Database Models
-    ↓
-CRUD APIs
-    ↓
-Train Impact Engine
-    ↓
-OR-Tools Optimization
-```
-
-Airflow and the React frontend will be integrated after the core backend and optimization engine are stable.
-
----
-
-## 💡 Core Concept
-
-The project can be summarized as:
-
-```text
-             MAINTENANCE REQUESTS
-                      │
-        ┌─────────────┼─────────────┐
-        ↓             ↓             ↓
-      TRACK         SIGNAL       TRACTION
-        │             │             │
-        └─────────────┼─────────────┘
-                      ↓
-               DATA INTEGRATION
-                      +
-               TRAIN MOVEMENTS
-                      +
-              RAILWAY NETWORK
-                      ↓
-              AI / ML ANALYSIS
-                      ↓
-               OR-TOOLS SOLVER
-                      ↓
-             OPTIMAL BLOCK PLAN
-                      ↓
-             LESS TRAIN DISRUPTION
-                      ↓
-             BETTER ASSET AVAILABILITY
-```
-
-**Built as a research prototype for intelligent railway maintenance scheduling and automated block planning.**
+Developed for the **Smart India Hackathon (SIH 2026)** under Problem Statement **26027** for the **Ministry of Railways**.  
+*All railway schedules, stations, and operational logic conform to Indian Railways General & Subsidiary Rules (G&SR) and IRPWM standards.*
