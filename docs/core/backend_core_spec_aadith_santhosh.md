@@ -61,7 +61,7 @@ flowchart TD
 * **Files:** `backend/app/services/ml_risk_engine.py`, `backend/app/api/risk_scoring.py`, `backend/app/schemas/risk.py`
 * **Artifact Bundle:** Loads verified bundle from `backend/data/ml_models/criticality_v1/` (`model.json`, `calibrator.joblib`, `schema.json`, `enums.json`, `ci_map.json`, `background.npz`, `model_card.json`).
 * **Two-Mode Architecture:**
-  1. **Mode 2 (Primary ML):** Monotone-constrained XGBoost/LightGBM classifier trained on simulated degradation hazard with domain randomization, calibrated via post-hoc isotonic regression, with probability-space SHAP explanations ($\text{base\_value} + \sum \phi_i \approx P(\text{failure})$) and percentile CI mapping ($CI \in [0, 100]$).
+  1. **Mode 2 (Primary ML):** Monotone-constrained XGBoost/LightGBM classifier trained on simulated degradation hazard with domain randomization, calibrated via post-hoc isotonic regression, with probability-space SHAP explanations ($\text{base} + \sum \phi_i \approx P(\text{failure})$) and percentile CI mapping ($CI \in [0, 100]$).
   2. **Mode 1 (Deterministic Fallback & Baseline):** Expert-weighted linear formula calibrated to IRPWM guidelines, used when ML artifacts are missing or for ablation comparison.
 * **Endpoints:**
   * `POST /api/v1/risk/predict`: Returns `failure_probability`, `criticality_index`, `model_used`, and probability-space `shap_explanation`.

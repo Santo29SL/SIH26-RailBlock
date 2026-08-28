@@ -114,7 +114,7 @@ flowchart TD
 ### 🔬 ML Models & Evaluation Protocol
 
 #### 1. Binary Maintenance Prioritization & Label Design
-* **Synthetic Hazard Simulation:** Labels represent simulated 30-day failure outcomes: $\text{failure\_30d} \sim \text{Bernoulli}\left(\sigma(\text{logit\_base} + \sum \beta_k f_k + \sum \gamma_{ij} \text{interaction}_{ij})\right)$ with domain randomization across 50 latent railway section regimes and configurable label noise (2–5%).
+* **Synthetic Hazard Simulation:** Labels represent simulated 30-day failure outcomes: $y \sim \text{Bernoulli}\left(\sigma(\text{logit}_0 + \sum \beta_k f_k + \sum \gamma_{ij} \text{interaction}_{ij})\right)$ with domain randomization across 50 latent railway section regimes and configurable label noise (2–5%).
 * **Non-Linear Interactions:** Incorporates domain physics including `usfd_flaw_severity × section_gmt_density`, `ohe_insulator_wear × section_gmt_density`, and `point_failure_risk × days_overdue`.
 
 #### 2. Cross-Validation & Calibration Benchmark
@@ -128,7 +128,7 @@ flowchart TD
 
 #### 3. Probability-Space SHAP Explainability
 * **Interventional TreeExplainer:** Built once on startup using a 200-sample background distribution:
-  $$\text{base\_value} + \sum_{i=1}^M \phi_i \approx P(\text{failure}_{30d})$$
+  $$\text{base} + \sum_{i=1}^M \phi_i \approx P(\text{failure})$$
 * **Human-Readable Natural Language Reasoning:**
   > *"Base failure rate 8%. USFD IMR flaw +21 pts, 80 km/h TSR +14, 14 days overdue +9, heavy-freight section +6, TGI deviation +3 → 61% simulated 30-day failure probability; CI 88 = riskier than 88% of the current backlog."*
 

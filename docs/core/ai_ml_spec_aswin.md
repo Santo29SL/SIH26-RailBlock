@@ -36,9 +36,9 @@ flowchart TD
 ## 2. Mathematical Formulation & Feature Specifications
 
 ### 2.1 v1 Rule-Based CI (evaluation baseline & deterministic fallback)
-$$CI = 0.30 \cdot \text{tgi\_deviation} + 0.25 \cdot \frac{\text{speed\_restriction\_kmh}}{1.2} + 0.20 \cdot \frac{\min(\text{days\_overdue}, 60)}{60} \cdot 100 + 0.15 \cdot \frac{\text{section\_gmt\_density}}{1.5} + \text{severity\_penalty}$$
+$$CI = 0.30 \cdot \text{TGI} + 0.25 \cdot \frac{\Delta v_{\text{TSR}}}{1.2} + 0.20 \cdot \frac{\min(\text{Overdue}, 60)}{60} \cdot 100 + 0.15 \cdot \frac{\text{GMT}}{1.5} + \text{Penalty}$$
 
-* **Severity Mapping:** The `severity_penalty` term is strictly driven by the statutory Indian Railways USFD classification:
+* **Severity Mapping:** The `Penalty` term is strictly driven by the statutory Indian Railways USFD classification:
   * `IMRW` (T1): $+35$
   * `IMR` (T1): $+25$
   * `OBSW` (T2): $+10$
@@ -47,16 +47,16 @@ $$CI = 0.30 \cdot \text{tgi\_deviation} + 0.25 \cdot \frac{\text{speed\_restrict
   Clipped to $[0, 100]$.
 
 ### 2.2 Labeling Strategy: Hazard Function with Domain Randomization
-Crucially, the machine learning objective is **binary maintenance prioritization** (predicting simulated 30-day track/asset failure: $\text{failure\_30d} \in \{0, 1\}$) driven by a latent non-linear degradation hazard process, **NOT regression onto our own v1 formula**.
+Crucially, the machine learning objective is **binary maintenance prioritization** (predicting simulated 30-day track/asset failure: $y \in \{0, 1\}$) driven by a latent non-linear degradation hazard process, **NOT regression onto our own v1 formula**.
 
 Labels are generated via a latent hazard probability:
-$$\text{hazard\_prob} = \sigma\left(\text{logit\_base} + \sum_{k} \beta_k f_k + \sum_{i,j} \gamma_{ij} \cdot (\text{interaction}_{ij})\right)$$
+$$P(\text{failure}) = \sigma\left(\text{logit}_0 + \sum_{k} \beta_k f_k + \sum_{i,j} \gamma_{ij} \cdot (\text{interaction}_{ij})\right)$$
 where interactions include:
-- $\text{usfd\_flaw\_severity} \times \text{section\_gmt\_density}$
-- $\text{ohe\_insulator\_wear} \times \text{section\_gmt\_density}$
-- $\text{point\_failure\_risk} \times \text{days\_overdue}$
+- $\text{USFD} \times \text{GMT}$
+- $\text{OHE Wear} \times \text{GMT}$
+- $\text{Point Risk} \times \text{Overdue}$
 
-**Domain Randomization:** Coefficients $(\beta, \gamma, \text{logit\_base})$ and latent section regimes are randomized across priors so the model learns general physical degradation relationships rather than memorizing a single fixed formula. Label noise ($2\text{--}5\%$) is injected, producing a realistic 5–15% base positive rate. Latent `hazard_prob` and `section_id` groups are strictly isolated as sidecars and never leaked into training features.
+**Domain Randomization:** Coefficients $(\beta, \gamma, \text{logit}_0)$ and latent section regimes are randomized across priors so the model learns general physical degradation relationships rather than memorizing a single fixed formula. Label noise ($2\text{--}5\%$) is injected, producing a realistic 5–15% base positive rate. Latent `hazard_prob` and `section_id` groups are strictly isolated as sidecars and never leaked into training features.
 
 ### 2.3 Feature Specifications
 
@@ -115,7 +115,7 @@ ml/
 
 ### Deliverable 3: SHAP Explainability in Probability Space (`ml/explainer.py`)
 * Initialize `shap.TreeExplainer(booster, data=background, model_output="probability", feature_perturbation="interventional")`.
-* Extract exact additive probability-space attributions satisfying $\text{base\_value} + \sum \phi_i \approx P(\text{failure})$.
+* Extract exact additive probability-space attributions satisfying $\text{base} + \sum \phi_i \approx P(\text{failure})$.
 * Generate human-readable reasoning strings for controllers.
 
 ### Deliverable 4: Binary Prioritization Evaluation (`ml/evaluate.py`)
