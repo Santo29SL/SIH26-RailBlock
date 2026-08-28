@@ -22,7 +22,7 @@ flowchart TD
     subgraph MIDDLEWARE_LAYER ["🔌 Middleware Client Layer"]
         AUTH[JWT Auth & Role-Based Route Guards<br/><i>Controller, Station Master, Engineer</i>]
         CLIENT[Centralized Axios / TanStack Query Client<br/><i>Auto-refreshing Bearer Tokens</i>]
-        SSE[Live SSE Telemetry Stream Listener<br/><i>Real-time delay popup toasts</i>]
+        WS[Live WebSocket Telemetry Stream Listener<br/><i>Real-time delay popup toasts</i>]
     end
 
     subgraph BACKEND_APIS ["⚡ Backend Core (FastAPI: localhost:8000)"]
@@ -31,7 +31,7 @@ flowchart TD
         API3[POST /api/v1/blocks/{id}/transition]
         API4[GET /api/v1/blocks/{id}/export-bdms & /t351-notice]
         API5[POST /api/v1/auth/login & /me]
-        API6[GET /api/v1/events/telemetry (SSE)]
+        API6[WS /api/v1/events/ws/telemetry]
     end
 
     FRONTEND_SPA <--> MIDDLEWARE_LAYER <--> BACKEND_APIS
@@ -52,7 +52,7 @@ frontend/
 │   │   ├── sections.ts            # Railway sections & train movement queries
 │   │   ├── optimizer.ts           # /run, /simulate, /commit-simulation queries
 │   │   ├── blocks.ts              # Block details, transitions, BDMS & T/351 exports
-│   │   └── events.ts              # SSE EventSource listener for live delay alerts
+│   │   └── events.ts              # WebSocket listener for live delay alerts
 │   ├── components/
 │   │   ├── layout/
 │   │   │   ├── Navbar.tsx         # Header, active division selector, user profile
@@ -172,7 +172,7 @@ frontend/
 * Response interceptor automatically catches `401 Unauthorized` and calls `POST /api/v1/auth/refresh`.
 
 ### 2. Live Telemetry Event Stream (`api/events.ts`)
-* Connect to `http://localhost:8000/api/v1/events/telemetry` using browser `EventSource`.
+* Connect to `ws://localhost:8000/api/v1/events/ws/telemetry` using browser `WebSocket`.
 * When a train delay event is received, trigger a floating popup toast notification:
   * *"⚠️ Disruption Alert: Train #12622 delayed by 35 mins on MAS-AJJ section. Localized block shift recommended."*
 
@@ -197,7 +197,9 @@ All of the following endpoints are **already built, verified, and running** on t
 | **11** | **Transition Block Status** | `POST /api/v1/blocks/{id}/transition` | `{"target_status": "ACTIVE", "private_number": "SM-104"}` |
 | **12** | **Export CRIS BDMS JSON** | `GET /api/v1/blocks/{id}/export-bdms` | `id` |
 | **13** | **Export Form T/351 Notice**| `GET /api/v1/blocks/{id}/t351-notice` | `id` |
-| **14** | **Live Telemetry Stream** | `GET /api/v1/events/telemetry` | *SSE Stream* |
+| **14** | **Predict AI Risk & Criticality** | `POST /api/v1/risk/predict` | `{"department": "TRACK", "metadata_json": {...}}` |
+| **15** | **Get AI Model Info** | `GET /api/v1/risk/model-info` | — |
+| **16** | **Live Telemetry Stream** | `WS /api/v1/events/ws/telemetry` | *WebSocket Connection* |
 
 ---
 

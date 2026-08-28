@@ -57,7 +57,10 @@ def test_predict_risk_bounds_and_shap():
     assert "criticality_index" in result
     ci = result["criticality_index"]
     assert 0.0 <= ci <= 100.0
-    assert result["model_used"].startswith("xgboost_shap")
+    assert any(
+        result["model_used"].startswith(prefix)
+        for prefix in ["xgboost_shap", "catboost_shap", "lightgbm_shap", "gbdt_shap"]
+    )
 
     shap_exp = result["shap_explanation"]
     assert "base_value" in shap_exp
@@ -89,7 +92,10 @@ async def test_risk_scoring_api_predict(client: AsyncClient):
     data = response.json()
     assert "criticality_index" in data
     assert 0.0 <= data["criticality_index"] <= 100.0
-    assert data["model_used"].startswith("xgboost_shap")
+    assert any(
+        data["model_used"].startswith(prefix)
+        for prefix in ["xgboost_shap", "catboost_shap", "lightgbm_shap", "gbdt_shap"]
+    )
     assert "shap_explanation" in data
     assert "human_readable_reasoning" in data["shap_explanation"]
     assert "extracted_features" in data
@@ -103,6 +109,6 @@ async def test_risk_scoring_api_model_info(client: AsyncClient):
 
     data = response.json()
     assert data["status"] == "ready"
-    assert data["algorithm"] == "XGBoost Regressor + SHAP TreeExplainer"
+    assert "SHAP TreeExplainer" in data["algorithm"]
     assert "features" in data
     assert len(data["features"]) == 8

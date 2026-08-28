@@ -22,7 +22,7 @@ flowchart TD
 
     subgraph BACKEND_ONLINE ["⚡ Backend Inference (FastAPI: backend/app/)"]
         SVC[backend/app/services/ml_risk_engine.py<br/><i>joblib.load() & <2ms inference</i>]
-        API[POST /api/v1/risk/score<br/><i>FastAPI Endpoint for Controllers & Gantt</i>]
+        API[POST /api/v1/risk/predict<br/><i>FastAPI Endpoint for Controllers & Gantt</i>]
         ART -.-> SVC --> API
     end
 ```
@@ -87,7 +87,7 @@ ml/
   * $R^2 \ge 0.95$
   * $\text{RMSE} \le 3.5$
   * $\text{MAE} \le 2.5$
-* Export the final winning model artifact to **`backend/data/ml_models/criticality_xgboost_v1.joblib`**.
+* Export the final winning model artifact to **`backend/data/ml_models/criticality_xgboost_v2.joblib`**.
 
 ### Deliverable 3: SHAP Explainability & Reasoning Generator (`ml/explainer.py`)
 * Initialize `shap.TreeExplainer` on the trained model.
@@ -100,15 +100,15 @@ ml/
 * **Context:** The current `ml_risk_engine.py` contains a temporary bootstrap fallback (`_generate_synthetic_training_data()` and an inline `xgb.fit()` call) to prevent early server crashes if the model file was absent.
 * **Action Required after Offline Training:**
   1. Once `ml/train.py` exports the production model artifact (`criticality_xgboost_v1.joblib` or `v2`), **remove the temporary inline training logic (`_generate_synthetic_training_data`) from `ml_risk_engine.py`**.
-  2. Ensure `ml_risk_engine.py` functions as a pure, lightweight inference service that simply loads the model via `joblib.load(MODEL_PATH)` on startup and returns instant `<2ms` predictions.
+  2. Ensure `ml_risk_engine.py` functions as a pure, lightweight inference service that dynamically loads the model via `joblib.load(MODEL_PATH)` on startup and returns instant `<2ms` predictions.
 
 ---
 
 ## 5. Input & Output Data Contracts (API Integration)
 
-The backend endpoint (`POST /api/v1/risk/score`) and Gantt chart consume your model using this exact contract:
+The backend endpoint (`POST /api/v1/risk/predict`) and Gantt chart consume your model using this exact contract:
 
-### Input Payload (`POST /api/v1/risk/score`):
+### Input Payload (`POST /api/v1/risk/predict`):
 ```json
 {
   "request_code": "MR-TRK-104",
@@ -131,7 +131,7 @@ The backend endpoint (`POST /api/v1/risk/score`) and Gantt chart consume your mo
 {
   "request_code": "MR-TRK-104",
   "criticality_index": 88.4,
-  "model_used": "xgboost_shap_v2",
+  "model_used": "catboost_shap_v2",
   "shap_explanation": {
     "base_value": 48.2,
     "feature_attributions": {
@@ -152,7 +152,7 @@ The backend endpoint (`POST /api/v1/risk/score`) and Gantt chart consume your mo
 
 1. **Install ML dependencies:**
    ```bash
-   pip install xgboost lightgbm shap scikit-learn pandas numpy joblib
+   pip install -r ml/requirements-ml.txt
    ```
 
 2. **Generate synthetic data & train the model:**

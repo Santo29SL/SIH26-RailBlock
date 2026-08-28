@@ -87,7 +87,7 @@ async def get_model_info():
     return {
         "stage": "Stage 2: AI Risk & Criticality Scoring Engine",
         "status": "ready" if risk_engine.model is not None else "degraded",
-        "algorithm": "XGBoost Regressor + SHAP TreeExplainer",
+        "algorithm": risk_engine.algorithm_name,
         "features": FEATURE_COLUMNS,
-        "version": "1.0.0",
+        "version": risk_engine.model_version,
     }

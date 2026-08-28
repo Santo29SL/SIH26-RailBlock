@@ -38,12 +38,13 @@ MODEL_V1_PATH = os.path.join(MODEL_CACHE_DIR, "criticality_xgboost_v1.joblib")
 
 
 class RiskScoringEngine:
-    """XGBoost + SHAP Risk and Criticality Scoring Engine (Lightweight Inference Service)."""
+    """XGBoost / CatBoost / LightGBM + SHAP Risk and Criticality Scoring Engine (Lightweight Inference Service)."""
 
     def __init__(self):
         self.model: Any = None
         self.explainer: Optional[shap.TreeExplainer] = None
         self.model_version: str = "deterministic_fallback"
+        self.algorithm_name: str = "Deterministic Asset Condition Heuristic (Fallback)"
         self._load_production_model()
 
     def _load_production_model(self) -> None:
@@ -52,22 +53,39 @@ class RiskScoringEngine:
             target_path = None
             if os.path.exists(MODEL_V2_PATH):
                 target_path = MODEL_V2_PATH
-                self.model_version = "xgboost_shap_v2"
             elif os.path.exists(MODEL_V1_PATH):
                 target_path = MODEL_V1_PATH
-                self.model_version = "xgboost_shap_v1"
 
             if target_path:
                 logger.info(f"Loading production ML model checkpoint from {target_path}")
                 self.model = joblib.load(target_path)
                 self.explainer = shap.TreeExplainer(self.model)
-                logger.info(f"✅ AI Risk Engine ({self.model_version}) loaded successfully.")
+
+                model_cls_name = type(self.model).__name__.lower()
+                version_suffix = "v2" if "v2" in target_path else "v1"
+
+                if "catboost" in model_cls_name:
+                    self.model_version = f"catboost_shap_{version_suffix}"
+                    self.algorithm_name = "CatBoost Regressor + SHAP TreeExplainer"
+                elif "xgb" in model_cls_name:
+                    self.model_version = f"xgboost_shap_{version_suffix}"
+                    self.algorithm_name = "XGBoost Regressor + SHAP TreeExplainer"
+                elif "lgbm" in model_cls_name or "lightgbm" in model_cls_name:
+                    self.model_version = f"lightgbm_shap_{version_suffix}"
+                    self.algorithm_name = "LightGBM Regressor + SHAP TreeExplainer"
+                else:
+                    self.model_version = f"gbdt_shap_{version_suffix}"
+                    self.algorithm_name = "GBDT Regressor + SHAP TreeExplainer"
+
+                logger.info(f"✅ AI Risk Engine ({self.algorithm_name}, version: {self.model_version}) loaded successfully.")
             else:
                 logger.warning("No model checkpoint found in backend/data/ml_models/. Using deterministic fallback.")
         except Exception as e:
             logger.warning(f"Failed to load ML model checkpoint ({e}); using deterministic fallback.")
             self.model = None
             self.explainer = None
+            self.model_version = "deterministic_fallback"
+            self.algorithm_name = "Deterministic Asset Condition Heuristic (Fallback)"
 
     def extract_features(
         self, request: Any, target_date: Optional[date] = None
