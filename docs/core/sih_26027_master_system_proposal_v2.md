@@ -93,7 +93,7 @@ flowchart TD
     end
 
     subgraph STAGE 6: Real-time Event Listener & SLW Rescheduling
-        G1[Live Telemetry WebSocket: Delay / Block Overrun] --> G2[Fast Heuristic Rescheduler & G&SR Ch 5/15 SLW Protocol]
+        G1[Live Telemetry WebSocket: Delay / Block Overrun] --> G2[Fast Heuristic Rescheduler & TSLW Advisory (GR 3.68; SR 4.42/Ch 15)]
         G2 --> F1
     end
 
@@ -113,7 +113,7 @@ flowchart TD
 | **Backend API & Core** | Python 3.12, FastAPI, Pydantic v2, `uv` | High-performance asynchronous REST APIs, dependency injection, and data validation |
 | **Authentication & Security** | OAuth2 Password Bearer, JWT (`python-jose`), `passlib[bcrypt]` | Token issuing, password hashing, 4+1-tier Role-Based Access Control (RBAC) |
 | **Middleware & Reliability** | `slowapi` (Limiter), `structlog`, OWASP Security Headers | 120 req/min rate limiting, structured JSON logging, XSS/Clickjacking protection |
-| **Optimization Solver** | Google OR-Tools (CP-SAT — constraint programming) | Space-Time-State constraint optimization with Tier-1 VIP protection and machine capacity limits |
+| **Optimization Solver** | Google OR-Tools (CP-SAT — constraint programming) | Candidate-block-to-corridor-gap assignment optimization with Tier-1 VIP protection and machine capacity limits |
 | **AI / ML & Explainability** | Python, `scikit-learn`, `xgboost`, `lightgbm`, `shap` | Dynamic Criticality Index ($CI \in [0, 100]$) and SHAP feature attribution |
 | **Database & ORM** | PostgreSQL 15 (9 Tables), SQLAlchemy 2.0 (Async), Alembic | Relational schema persistence, migrations, and synthetic seed sandbox calibrated to published IR statistics |
 | **Real-time Telemetry** | WebSockets (`/api/v1/events/ws/telemetry`), Server-Sent Events | Live train delay broadcast stream and Single Line Working (SLW) alert push |
@@ -263,7 +263,7 @@ Live TMS/SMMS/TDMS/COA feeds are RailNet-internal and cannot be accessed during 
 ### 6.2 Authentication, RBAC & API Security Layer
 * **Password Hashing:** `bcrypt` with automatic salt generation and 72-byte truncation protection.
 * **JWT Tokens:** Signed `HS256` Bearer tokens with 480-minute TTL containing `sub`, `role`, `user_id`, `email`.
-* **Role-Based Access Control (4+1-tier Role-Based Access Control (RBAC)):**
+* **Role-Based Access Control (4+1-tier RBAC):**
   1. `ADMIN`: Full administrative access and system user management.
   2. `SECTION_CONTROLLER`: Block generation, What-If simulation, and schedule commitment.
   3. `STATION_MASTER`: Private Number issuance and Form T/351 Disconnection/Reconnection authorization.
