@@ -57,7 +57,7 @@ def test_predict_risk_bounds_and_shap():
     assert "criticality_index" in result
     ci = result["criticality_index"]
     assert 0.0 <= ci <= 100.0
-    assert result["model_used"] == "xgboost_shap_v1"
+    assert result["model_used"].startswith("xgboost_shap")
 
     shap_exp = result["shap_explanation"]
     assert "base_value" in shap_exp
@@ -89,7 +89,7 @@ async def test_risk_scoring_api_predict(client: AsyncClient):
     data = response.json()
     assert "criticality_index" in data
     assert 0.0 <= data["criticality_index"] <= 100.0
-    assert data["model_used"] == "xgboost_shap_v1"
+    assert data["model_used"].startswith("xgboost_shap")
     assert "shap_explanation" in data
     assert "human_readable_reasoning" in data["shap_explanation"]
     assert "extracted_features" in data

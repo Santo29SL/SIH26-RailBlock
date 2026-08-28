@@ -1,4 +1,4 @@
-"""Stage 2: AI Risk & Criticality Scoring Engine.
+"""Stage 2: AI Risk & Criticality Scoring Engine (Inference Service).
 
 Uses XGBoost / Gradient Boosted Regression Trees and SHAP (SHapley Additive exPlanations)
 to compute dynamic Criticality Index (CI ∈ [0, 100]) and human-explainable feature attributions
@@ -10,15 +10,13 @@ from __future__ import annotations
 import logging
 import os
 from datetime import date
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional
 
 import joblib
 import numpy as np
 import pandas as pd
 import shap
 import xgboost as xgb
-
-from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -35,80 +33,39 @@ FEATURE_COLUMNS = [
 ]
 
 MODEL_CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "ml_models")
-MODEL_PATH = os.path.join(MODEL_CACHE_DIR, "criticality_xgboost_v1.joblib")
+MODEL_V2_PATH = os.path.join(MODEL_CACHE_DIR, "criticality_xgboost_v2.joblib")
+MODEL_V1_PATH = os.path.join(MODEL_CACHE_DIR, "criticality_xgboost_v1.joblib")
 
 
 class RiskScoringEngine:
-    """XGBoost + SHAP Risk and Criticality Scoring Engine."""
+    """XGBoost + SHAP Risk and Criticality Scoring Engine (Lightweight Inference Service)."""
 
     def __init__(self):
-        self.model: Optional[xgb.XGBRegressor] = None
+        self.model: Any = None
         self.explainer: Optional[shap.TreeExplainer] = None
-        self._initialize_or_load_model()
+        self.model_version: str = "deterministic_fallback"
+        self._load_production_model()
 
-    def _generate_synthetic_training_data(self, n_samples: int = 2000) -> Tuple[pd.DataFrame, np.ndarray]:
-        """Generate domain-grounded synthetic training data for Indian Railways maintenance defects."""
-        np.random.seed(42)
-
-        tgi = np.random.uniform(0, 100, n_samples)
-        speed_rest = np.random.uniform(0, 100, n_samples)
-        days_overdue = np.random.uniform(0, 45, n_samples)
-        gmt = np.random.uniform(5, 120, n_samples)
-        dept = np.random.choice([0, 1, 2], n_samples)  # TRACK, SIGNAL, TRACTION
-        usfd = np.random.choice([0, 1, 2, 3], n_samples, p=[0.5, 0.25, 0.15, 0.10])
-        point_risk = np.random.uniform(0, 100, n_samples)
-        ohe_wear = np.random.uniform(0, 100, n_samples)
-
-        # Ground truth Criticality Index equation + domain non-linear interaction noise
-        ci = (
-            0.30 * tgi
-            + 0.20 * speed_rest
-            + 0.65 * (days_overdue * 2.0)
-            + 0.15 * gmt
-            + 12.0 * usfd
-            + 0.15 * (point_risk * (dept == 1))
-            + 0.15 * (ohe_wear * (dept == 2))
-            + np.random.normal(0, 2.5, n_samples)
-        )
-        ci = np.clip(ci, 0.0, 100.0)
-
-        df = pd.DataFrame(
-            {
-                "tgi_deviation": tgi,
-                "speed_restriction_kmh": speed_rest,
-                "days_overdue": days_overdue,
-                "section_gmt_density": gmt,
-                "department_code": dept,
-                "usfd_flaw_severity": usfd,
-                "point_failure_risk": point_risk,
-                "ohe_insulator_wear": ohe_wear,
-            }
-        )
-        return df, ci
-
-    def _initialize_or_load_model(self) -> None:
-        """Train or load pretrained XGBoost model and setup SHAP explainer."""
+    def _load_production_model(self) -> None:
+        """Load pretrained production model checkpoint (v2 or fallback v1)."""
         try:
-            if os.path.exists(MODEL_PATH):
-                logger.info(f"Loading pretrained XGBoost Risk Model from {MODEL_PATH}")
-                self.model = joblib.load(MODEL_PATH)
-            else:
-                logger.info("Building and training initial XGBoost Risk Model...")
-                X, y = self._generate_synthetic_training_data()
-                self.model = xgb.XGBRegressor(
-                    n_estimators=100,
-                    max_depth=4,
-                    learning_rate=0.08,
-                    random_state=42,
-                )
-                self.model.fit(X, y)
-                os.makedirs(MODEL_CACHE_DIR, exist_ok=True)
-                joblib.dump(self.model, MODEL_PATH)
+            target_path = None
+            if os.path.exists(MODEL_V2_PATH):
+                target_path = MODEL_V2_PATH
+                self.model_version = "xgboost_shap_v2"
+            elif os.path.exists(MODEL_V1_PATH):
+                target_path = MODEL_V1_PATH
+                self.model_version = "xgboost_shap_v1"
 
-            self.explainer = shap.TreeExplainer(self.model)
-            logger.info("✅ XGBoost + SHAP Risk Engine initialized successfully.")
+            if target_path:
+                logger.info(f"Loading production ML model checkpoint from {target_path}")
+                self.model = joblib.load(target_path)
+                self.explainer = shap.TreeExplainer(self.model)
+                logger.info(f"✅ AI Risk Engine ({self.model_version}) loaded successfully.")
+            else:
+                logger.warning("No model checkpoint found in backend/data/ml_models/. Using deterministic fallback.")
         except Exception as e:
-            logger.warning(f"Failed to initialize ML model ({e}); will use deterministic fallback.")
+            logger.warning(f"Failed to load ML model checkpoint ({e}); using deterministic fallback.")
             self.model = None
             self.explainer = None
 
@@ -172,12 +129,19 @@ class RiskScoringEngine:
         features_dict = self.extract_features(request, target_date)
 
         if self.model is None or self.explainer is None:
-            # Fallback if ML packages fail
+            # Deterministic fallback calculation
+            tgi = features_dict["tgi_deviation"]
+            speed_rest = features_dict["speed_restriction_kmh"]
+            days_overdue = features_dict["days_overdue"]
+            gmt = features_dict["section_gmt_density"]
+            usfd = features_dict["usfd_flaw_severity"]
+            fallback_ci = round(min(100.0, max(0.0, 0.3 * tgi + 0.2 * speed_rest + 1.2 * days_overdue + 0.1 * gmt + 10.0 * usfd)), 2)
+
             return {
-                "criticality_index": 50.0,
+                "criticality_index": fallback_ci,
                 "model_used": "deterministic_fallback",
                 "shap_explanation": {
-                    "human_readable_reasoning": "ML Engine unavailable; using fallback score.",
+                    "human_readable_reasoning": f"Job rated {fallback_ci}/100 based on standard asset condition metrics.",
                     "feature_attributions": {},
                 },
             }
@@ -219,7 +183,7 @@ class RiskScoringEngine:
 
         return {
             "criticality_index": pred_ci,
-            "model_used": "xgboost_shap_v1",
+            "model_used": self.model_version,
             "shap_explanation": {
                 "base_value": round(base_val, 2),
                 "feature_attributions": attributions,

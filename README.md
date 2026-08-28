@@ -14,163 +14,209 @@ Railway infrastructure maintenance across Indian Railways operates across three 
 
 Independent departmental corridor possessions cause repeated solo track closures, passenger train detentions, and diminished network capacity.
 
-**RailBlock** is a centralized decision-support and constraint-optimization platform that coordinates multi-departmental maintenance requests, identifies continuous traffic downtime gaps, bundles compatible tasks into **Joint Shadow Blocks**, and solves optimal schedules using **Google OR-Tools Mixed-Integer Linear Programming (MILP)** while strictly enforcing **G&SR statutory safety rules** and protecting high-priority passenger corridors (Rajdhani, Vande Bharat).
+**RailBlock** is a centralized decision-support and constraint-optimization platform that coordinates multi-departmental maintenance requests, identifies continuous traffic downtime gaps, bundles compatible tasks into **Joint Shadow Blocks**, and solves optimal schedules using **Google OR-Tools Mixed-Integer Linear Programming (MILP)** while strictly enforcing **G&SR statutory safety rules** and protecting high-priority passenger corridors (Rajdhani, Vande Bharat, Shatabdi).
 
 ---
 
-## 🏗️ System Architecture & Pipeline
+## 🏗️ System Architecture & 7-Stage Pipeline Workflow
 
 ```mermaid
-flowchart LR
-    TMS[Track Defect Data<br/>TGI, USFD Flaws] --> STAGE2
-    SMMS[Signal Health Logs<br/>Points, Axle Counters] --> STAGE2
-    TDMS[Traction OHE Data<br/>Wire Wear, FP/SP Zones] --> STAGE2
-
-    subgraph STAGE2 ["Stage 2: AI Risk Scoring Engine"]
-        XGB[XGBoost / LightGBM Regressor] --> CI[Criticality Index: 0-100]
-        XGB --> SHAP[SHAP Feature Attribution]
+flowchart TD
+    subgraph DATA_SOURCES ["1. Data Ingestion & Edge Adapters"]
+        TMS["Track Management System (TMS)<br/><i>Track Geometry, USFD Flaws</i>"]
+        SMMS["Signal Maintenance System (SMMS)<br/><i>Point Latencies, Track Circuits</i>"]
+        TDMS["Traction Distribution System (TDMS)<br/><i>OHE Wire Wear, FP/SP Zones</i>"]
+        COA["Control Office Application (COA)<br/><i>8,000+ IR Train Timetables</i>"]
     end
 
-    COA[COA Timetables<br/>8,000+ Real IR Trains] --> STAGE3[Stage 3: Gap Extractor<br/>≥15 min Safety Buffers]
+    subgraph STAGE2 ["2. AI Risk Scoring Engine (ml/)"]
+        ML_MODEL["CatBoost / XGBoost Regressor<br/><i>R² = 0.9881 | RMSE = 2.28</i>"]
+        SHAP_ENGINE["SHAP TreeExplainer<br/><i>Game-Theoretic Feature Attribution</i>"]
+        ML_MODEL --> CI["Criticality Index (CI ∈ [0, 100])"]
+        SHAP_ENGINE --> REASONING["Controller Natural Language Reasoning"]
+    end
 
-    STAGE2 --> STAGE4[Stage 4: Shadow Clustering<br/>G&SR Safety Matrix & ≤10km Bounds]
-    STAGE3 --> STAGE4
+    subgraph STAGE3 ["3. Corridor Gap & Headway Extractor"]
+        GAP["Corridor Gap Extractor<br/><i>Continuous slots ≥60m</i>"]
+        HEADWAY["Statutory Safety Headway<br/><i>Enforces ≥15m buffer before/after trains</i>"]
+        MIDNIGHT["Rolling Midnight Stitching<br/><i>Stitches gaps across day boundaries</i>"]
+        GAP --> HEADWAY --> MIDNIGHT
+    end
 
-    STAGE4 --> STAGE5[Stage 5: Google OR-Tools MILP<br/>Tier-1 VIP Zero-Detention Solver]
+    subgraph STAGE4 ["4. Joint Shadow Clustering"]
+        SPATIAL["Spatial Bounds: ≤10 km"]
+        ELECTRICAL["Traction Isolation: FP/SP Zones (40-80 km)"]
+        SAFETY_MATRIX["G&SR Safety Matrix Enforcement<br/><i>Prevents conflicting concurrent work</i>"]
+        SPATIAL & ELECTRICAL & SAFETY_MATRIX --> SHADOW_BLOCKS["Joint Shadow Blocks"]
+    end
 
-    LIVE[Live Delay Telemetry<br/>Delays > 20 min] --> STAGE6[Stage 6: Fast Rescheduler<br/>Sub-second Shift & SLW Protocol]
+    subgraph STAGE5 ["5. Google OR-Tools MILP Solver"]
+        OR_TOOLS["Google OR-Tools CP-SAT Solver"]
+        HARD_CONSTRAINTS["Tier-1 VIP Zero Detention Hard Rule<br/><i>Rajdhani & Vande Bharat Protection</i>"]
+        SIMULATOR["What-If Sandbox Simulation<br/><i>HMAC Cryptographic Commit Tokens</i>"]
+        OR_TOOLS --> HARD_CONSTRAINTS --> SIMULATOR
+    end
 
-    STAGE5 --> STAGE7[Stage 7: Control Office Dashboard<br/>Dual Gantt, GIS Map, Form T/351, CRIS BDMS]
-    STAGE6 --> STAGE7
+    subgraph STAGE6 ["6. Fast Rescheduler & Telemetry"]
+        GREEDY["Sub-second Greedy Rescheduler<br/><i>Live delays > 20 mins</i>"]
+        SLW["Emergency Single Line Working (SLW)<br/><i>G&SR Chapter 5/15 Protocol</i>"]
+        SSE["Server-Sent Events (SSE) Stream<br/><i>Live Disruption Alerts</i>"]
+        GREEDY --> SLW --> SSE
+    end
+
+    subgraph STAGE7 ["7. Statutory Exports & Interfaces"]
+        T351["Form T/351 Disconnection Portal<br/><i>Station Master Private Numbers (PN)</i>"]
+        BDMS["CRIS BDMS Exporter<br/><i>Official Draft Possession Requests</i>"]
+    end
+
+    TMS & SMMS & TDMS --> STAGE2
+    COA --> STAGE3
+    STAGE2 & STAGE3 --> STAGE4
+    STAGE4 --> STAGE5
+    STAGE5 --> STAGE6
+    STAGE5 & STAGE6 --> STAGE7
 ```
 
 ---
 
-## ⚡ Key System Capabilities
+## ⚡ Stage-by-Stage Functional Breakdown
 
-* **Stage 1 — Multi-System Data Ingestion & Legacy Adapters:** Ingests TMS (Track flaws & TGI), SMMS (Point machines & axle counters), TDMS (OHE wire wear & power zones), and COA (Timetables) via structured edge adapters.
-* **Stage 2 — AI Risk & Criticality Scoring Engine:** Predicts dynamic Criticality Index ($CI \in [0, 100]$) using Gradient Boosted Trees (`XGBoost` / `LightGBM`) with SHAP explainability for Section Controllers.
-* **Stage 3 — Corridor Gap & Headway Extractor:** Automatically extracts continuous unoccupied track windows ($\ge 60\text{ min}$) with mandatory statutory **$\ge 15\text{ min}$ safety headways** and continuous rolling midnight stitching.
-* **Stage 4 — Joint Shadow Block Clustering:** Bundles multi-department tasks occurring within $\le 10\text{ km}$ spatial bounds and Substation Feeding Post (FP) / Sectioning Post (SP) power zones ($40\text{--}80\text{ km}$), strictly enforcing the **G&SR Safety Conflict Matrix** to prevent dangerous concurrent work (e.g. tamping vs. point testing).
-* **Stage 5 — Google OR-Tools MILP Solver:** Space-Time CP-SAT constraint optimization enforcing **hard zero-detention constraints for Tier 1 VIP trains (Rajdhani, Vande Bharat)**, machine resource limits (Tamping Machines, Tower Wagons), and multi-objective score maximization.
-* **Stage 6 — Real-Time Fast Rescheduler & SLW Fallback:** Sub-millisecond greedy time-shifting for live train delays $> 20\text{ min}$, and automatic **G&SR Chapter 5/15 Single Line Working (SLW)** emergency advisory generation on block overruns.
-* **Stage 7 — Statutory Form T/351 & CRIS BDMS Exporters:** Enforces digital Station Master **Private Number (PN)** exchanges for track disconnection/reconnection and exports draft possession requests in official **CRIS BDMS JSON format**.
-* **Security & Access Control:** JWT authentication with 7 role-based access control tiers (`ADMIN`, `CONTROLLER`, `STATION_MASTER`, `ENGINEER_TRACK`, `ENGINEER_SIGNAL`, `ENGINEER_TRACTION`, `VIEWER`).
-
----
-
-## 🧩 Technology Stack
-
-| Layer | Technologies Used | Responsibility |
-| :--- | :--- | :--- |
-| **Backend Core** | Python 3.12, FastAPI, Pydantic v2, `uv` | High-performance asynchronous REST APIs & business logic |
-| **Optimization Solver** | Google OR-Tools (CP-SAT MILP) | Space-time block scheduling & capacity constraint solver |
-| **AI / ML Risk Scoring** | XGBoost, LightGBM, Scikit-learn, SHAP | Dynamic Criticality Index ($CI \in [0, 100]$) & XAI explainability |
-| **Database & ORM** | PostgreSQL 15, SQLAlchemy 2.0 (Async), Alembic | Relational data models, migrations, and seed repository |
-| **Frontend UI (WIP)** | React (v18+), Vite, TypeScript, TailwindCSS, Leaflet, D3 | Control Office Dual-Swimlane Gantt, GIS Map & What-If Slider UI |
-| **Real-time Telemetry** | Server-Sent Events (SSE), WebSockets | Real-time live train delay broadcasts & disruption alerts |
-| **Containerization** | Docker, Docker Compose, pgAdmin 4 | Production container orchestration & database management |
+* **Stage 1 — Multi-System Data Ingestion & Adapters:** Ingests maintenance defect requisitions from **TMS** (Civil Track), **SMMS** (Signal & Telecom), **TDMS** (Traction Distribution/Electrical), and train movements from **COA**. Edge adapters (`adapters.py`) normalize incoming requisitions into uniform `MaintenanceRequest` domain objects.
+* **Stage 2 — AI Risk & Criticality Scoring Engine:** Predicts a dynamic **Criticality Index ($CI \in [0, 100]$)** using gradient boosted trees (CatBoost/XGBoost) trained on domain-grounded Indian Railways degradation parameters. Evaluates feature contributions using **SHAP** to produce controller-facing explanations.
+* **Stage 3 — Corridor Gap & Headway Extractor:** Analyzes COA timetables to identify unoccupied track windows ($\ge 60\text{ min}$) with statutory **$\ge 15\text{ min}$ safety headways** before and after train movements, stitching gaps across midnight rolling boundaries.
+* **Stage 4 — Joint Shadow Block Clustering:** Bundles compatible multi-department maintenance tasks occurring within $\le 10\text{ km}$ spatial bounds and Substation Feeding Post (FP) / Sectioning Post (SP) electrical power zones ($40\text{--}80\text{ km}$), strictly enforcing the **G&SR Statutory Safety Conflict Matrix**.
+* **Stage 5 — Google OR-Tools CP-SAT MILP Optimization Solver:** Formulates a Space-Time Mixed-Integer Linear Programming (MILP) model. Enforces **hard zero-detention constraints for Tier 1 VIP trains (Rajdhani, Vande Bharat, Shatabdi)** while optimizing block placement, shadow overlap hours, and equipment resource availability.
+* **Stage 6 — Real-Time Fast Rescheduler & Emergency Protocol:** Triggers sub-second greedy time-shifting when live train delays exceed $20\text{ minutes}$. Automatically generates **G&SR Chapter 5/15 Single Line Working (SLW)** emergency advisories if block overruns threaten traffic flow.
+* **Stage 7 — Statutory Form T/351 & CRIS BDMS Exporters:** Enforces digital Station Master **Private Number (PN)** exchanges for track disconnections/reconnections and exports draft possession requests directly in official **CRIS BDMS JSON format**.
 
 ---
 
-## 📂 Project Structure
+## 🤖 AI / ML Risk Engine & Explainability (Stage 2 Deep-Dive)
+
+### 📊 Feature Engineering Matrix
+
+| Feature Name | Type | Range | Department | Domain Description |
+| :--- | :---: | :---: | :---: | :--- |
+| **`tgi_deviation`** | `float` | `0.0` -- `100.0` | Track (TMS) | Deviation from standard Track Geometry Index ($100 - \text{TGI}$). |
+| **`speed_restriction_kmh`**| `float` | `0.0` -- `100.0` | All | Speed drop delta ($\text{MPS} - v_{\text{TSR}}$). |
+| **`days_overdue`** | `float` | `0.0` -- `60.0` | All | Days elapsed past statutory maintenance deadline. |
+| **`section_gmt_density`** | `float` | `5.0` -- `150.0` | All | Annual Gross Million Tonnes carried by section (traffic density). |
+| **`department_code`** | `int` | `0, 1, 2` | All | `0`: Track (TMS), `1`: Signal (SMMS), `2`: Traction (TDMS). |
+| **`usfd_flaw_severity`** | `int` | `0` -- `3` | Track (TMS) | `0`: None, `1`: OBS, `2`: REM, `3`: `IMR` (*Immediate Removal*). |
+| **`point_failure_risk`** | `float` | `0.0` -- `100.0` | Signal (SMMS) | S&T Point machine locking latency failure risk ($>4.5\text{s}$). |
+| **`ohe_insulator_wear`** | `float` | `0.0` -- `100.0` | Traction (TDMS) | OHE contact wire wear percentage ($>20\text{--}30\%$ limit). |
+
+---
+
+### 🔬 ML Models & Mathematical Theory
+
+#### 1. XGBoost (Extreme Gradient Boosting)
+* **Mathematical Theory:** Minimizes a regularized objective function using a 2nd-order Taylor expansion:
+$$\mathcal{L}^{(t)} = \sum_{i=1}^n l\left(y_i, \hat{y}_i^{(t-1)} + f_t(x_i)\right) + \gamma T + \frac{1}{2}\lambda \sum_{j=1}^T w_j^2$$
+Optimal leaf weight $w_j^*$ for leaf $j$ with gradients $g_i$ and Hessians $h_i$:
+$$w_j^* = -\frac{\sum_{i \in I_j} g_i}{\sum_{i \in I_j} h_i + \lambda}$$
+* **Implementation & Results:** Optimized via Optuna in `ml/train.py`. Achieved 5-fold CV RMSE of **`2.6322`**.
+
+#### 2. LightGBM (Light Gradient Boosting Machine)
+* **Mathematical Theory:** Uses **Leaf-wise (best-first)** tree growth and **Gradient-based One-Side Sampling (GOSS)** to inspect instances with larger gradients.
+* **Implementation & Results:** Evaluated in Optuna study. Achieved 5-fold CV RMSE of **`2.7775`**.
+
+#### 3. CatBoost (Categorical Boosting) — 🏆 Winning Model
+* **Mathematical Theory:** Employs **Ordered Boosting** to prevent target leakage and **Symmetric (Oblivious) Trees** where every node at a given level uses the exact same split condition. This guarantees fast hardware SIMD vectorization and prevents overfitting.
+* **Implementation & Results:** **Won the model benchmark** with 5-fold CV RMSE of **`2.3476`**.
+* **Final Test Evaluation Metrics:**
+  * **$R^2 \text{ Score} = 0.9881$** (Target: $\ge 0.95$) ✅
+  * **$\text{RMSE} = 2.2866$** (Target: $\le 3.5$) ✅
+  * **$\text{MAE} = 1.7358$** (Target: $\le 2.5$) ✅
+* Model Artifact: `backend/data/ml_models/criticality_xgboost_v2.joblib`
+
+#### 4. SHAP (SHapley Additive exPlanations)
+* **Mathematical Theory:** Game-theoretic feature attributions computing exact marginal contributions across feature subsets $S$:
+$$\phi_i(x) = \sum_{S \subseteq F \setminus \{i\}} \frac{|S|!(|F| - |S| - 1)!}{|F|!} \left[ f\left(S \cup \{i\}\right) - f(S) \right]$$
+* **Output:** Generates human-readable controller reasonings (e.g., *"Job rated 88.4/100 [CRITICAL] primarily driven by USFD Ultrasonic Rail Flaw (+36.5 pts)"*). Diagnostic plots saved in `ml/reports/`.
+
+---
+
+## 📂 Project Directory Structure
 
 ```text
 SIH26-RailBlock/
 ├── backend/
-│   ├── alembic/                 # Database migrations (Alembic)
+│   ├── alembic/                 # Database schema migration scripts (Alembic)
 │   ├── app/
-│   │   ├── api/                 # FastAPI Route Routers (auth, blocks, optimizer, risk, events)
-│   │   ├── core/                # App config, database session, JWT security, permissions
-│   │   ├── models/              # SQLAlchemy 2.0 async database models (9 tables)
-│   │   ├── schemas/             # Pydantic v2 validation & response schemas
+│   │   ├── api/                 # FastAPI REST Endpoint Routers (auth, blocks, optimizer, risk, events)
+│   │   ├── core/                # System configuration, Async SQLAlchemy session, JWT & RBAC security
+│   │   ├── models/              # SQLAlchemy 2.0 async database ORM models (9 tables)
+│   │   ├── schemas/             # Pydantic v2 validation & response contracts
 │   │   ├── services/            # Pure computational engines (gap_extractor, clustering, optimizer, rescheduler)
-│   │   └── main.py              # Application factory, rate limiting & logging middleware
+│   │   └── main.py              # Application factory & middleware setup
 │   ├── data/
-│   │   ├── raw/                 # Real IR Open Data: 8,990 Stations & 8,000+ Trains
-│   │   ├── ml_models/           # Exported XGBoost model weights (.joblib)
-│   │   └── seed_all.py          # Database seeder for stations, trains, rules, and requests
-│   ├── tests/                   # Automated Unit and Integration tests (pytest)
-│   ├── Dockerfile               # Production multi-stage Docker container
-│   ├── entrypoint.sh            # Auto migration + seed + startup script
-│   └── requirements.txt         # Production Python dependencies
+│   │   ├── raw/                 # Real IR Open Data (8,990 Stations & 8,000+ Trains)
+│   │   ├── ml_models/           # Exported production models (criticality_xgboost_v2.joblib)
+│   │   └── seed_all.py          # Database seeder script
+│   ├── tests/                   # Automated pytest suite (111 passing tests)
+│   ├── Dockerfile               # Multi-stage production container configuration
+│   ├── entrypoint.sh            # Auto-migration + seed + server startup script
+│   └── requirements.txt         # Production backend dependencies
 │
-├── ml/                          # Dedicated AI/ML Workspace (Offline Training & Explainer)
-│   ├── data/                    # Dataset storage & generator
-│   └── models/                  # Offline model checkpoints
+├── ml/                          # Dedicated Offline AI/ML Development Workspace
+│   ├── data/
+│   │   ├── synthetic_generator.py # Domain-grounded IR dataset generator (6,000 samples)
+│   │   └── ir_defects_dataset.csv # Output synthetic dataset
+│   ├── reports/                 # Diagnostic plots (feature_importance.png, shap_beeswarm_summary.png)
+│   ├── train.py                 # Optuna hyperparameter tuning (XGBoost, LightGBM, CatBoost)
+│   ├── evaluate.py              # Benchmark evaluation (R², RMSE, MAE) & diagnostic report generator
+│   ├── explainer.py             # SHAP TreeExplainer & controller reasoning string builder
+│   └── requirements-ml.txt      # Dedicated ML dependencies
 │
-├── frontend/                    # React + Vite + TailwindCSS SPA (Control Office Dashboard)
-│
-├── docs/
-│   ├── adr/                     # 6 Architectural Decision Records (ADRs)
-│   └── core/                    # System specifications for Backend Core, AI/ML, and Frontend
-│
+├── docs/                        # Specifications & 6 Architectural Decision Records (ADRs)
 ├── CONTEXT.md                   # Canonical Railway Domain Glossary
-├── docker-compose.yml           # Multi-container orchestration (Postgres, pgAdmin, Backend)
+├── docker-compose.yml           # Multi-container orchestration (PostgreSQL 15, pgAdmin, Backend)
 └── README.md                    # Main documentation
 ```
 
 ---
 
-## 🚀 Quickstart & Local Setup
+## 🐳 Docker Deployment & Quickstart
+
+RailBlock is fully containerized with multi-container orchestration.
 
 ### Prerequisites
-* **Python 3.12+**
-* **[`uv`](https://github.com/astral-sh/uv)** (Fast Python package manager)
-* **Docker & Docker Compose**
+* **Docker & Docker Compose** installed on your system.
 
 ---
 
-### Step 1: Clone the Repository & Configure Environment
+### Step 1: Clone Repository & Configure Environment
 
 ```bash
 git clone https://github.com/Santo29SL/SIH26-RailBlock.git
 cd SIH26-RailBlock
 
-# Copy environment variables
+# Copy environment template
 cp .env.example .env
 ```
 
 ---
 
-### Step 2: Start PostgreSQL & pgAdmin + Dependencies in Docker
+### Step 2: Launch Full Application Stack with One Command
 
 ```bash
-docker compose up -d 
+docker compose up -d
 ```
-* **PostgreSQL:** `localhost:5433` (Database: `railblock`, User: `postgres`, Password: `postgres`)
-* **pgAdmin:** `http://localhost:5050` (Email: `admin@railblock.dev`, Password: `admin`)
+
+This automatically:
+1. Provisions **PostgreSQL 15** on port `5433` and **pgAdmin 4** on `http://localhost:5050`.
+2. Runs database migrations (`alembic upgrade head`).
+3. Seeds real Indian Railways stations (8.9k), trains (8k+), and maintenance requisitions.
+4. Starts the **FastAPI Backend Core** on `http://localhost:8000`.
 
 ---
 
-### Step 3: Install Backend Dependencies & Run Migrations
+### Step 3: Access Interactive API Documentation
 
-```bash
-cd backend
-
-# 1. Create virtual environment & install dependencies using uv
-uv venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv pip install -r requirements.txt
-
-# 2. Run database migrations
-uv run alembic upgrade head
-
-# 3. Seed real Indian Railways stations (8.9k), trains (8k+), and maintenance requests
-uv run python -m data.seed_all
-```
-
----
-
-### Step 4: Launch the FastAPI Backend Server
-
-```bash
-uv run uvicorn app.main:app --reload --port 8000
-```
-
-* **Backend API:** `http://localhost:8000`
-* **Interactive Swagger API Documentation:** `http://localhost:8000/docs`
+* **Interactive Swagger UI:** `http://localhost:8000/docs`
 * **ReDoc Documentation:** `http://localhost:8000/redoc`
+* **pgAdmin Console:** `http://localhost:5050` (*Email: admin@railblock.dev | Password: admin*)
 
 ---
 
@@ -193,25 +239,15 @@ uv run uvicorn app.main:app --reload --port 8000
 
 ---
 
-## 👥 System Workstreams & Architecture Modules
-
-| Module / Workstream | Functional Focus | Deliverables & Scope |
-| :--- | :--- | :--- |
-| **Backend Core & Optimization** | Space-Time Planning & Scheduling | Gap Extractor, Shadow Block Clustering, Google OR-Tools Solver, Rescheduler, Form T/351 & BDMS APIs |
-| **AI / ML & Explainability** | Risk Prioritization & Explainable AI | Stage 2 XGBoost/LightGBM Criticality Index model ($CI \in [0, 100]$) & SHAP controller reasoning |
-| **Frontend & Middleware** | Control Office Visualization & Integration | Control Office Dashboard (React/Vite), Dual-Swimlane Gantt, Leaflet GIS Map, What-If Slider UI |
-
----
-
 ## 📜 Architectural Decision Records (ADRs)
 
-Key architectural decisions are documented under [`docs/adr/`](file:///home/aadith/SIH/RailBlock-Aadith/docs/adr/):
-* [`ADR 0001: Two-Tier Optimization Architecture (Offline MILP + Real-Time Greedy Heuristic)`](file:///home/aadith/SIH/RailBlock-Aadith/docs/adr/0001-two-tier-optimization-architecture.md)
-* [`ADR 0002: Read-Only Edge Gateway & RailNet Air-Gap Security`](file:///home/aadith/SIH/RailBlock-Aadith/docs/adr/0002-read-only-edge-gateway-air-gap.md)
-* [`ADR 0003: Tiered Train Detention & Zero-Tolerance VIP Timetable Protection`](file:///home/aadith/SIH/RailBlock-Aadith/docs/adr/0003-tiered-train-detention-and-priority-protection.md)
-* [`ADR 0004: Directional Track Possession & Flexible Internal Shadow Offsets`](file:///home/aadith/SIH/RailBlock-Aadith/docs/adr/0004-directional-possession-and-flexible-shadow-windows.md)
-* [`ADR 0005: Statutory Block Lifecycle & Station Master Private Number State Machine`](file:///home/aadith/SIH/RailBlock-Aadith/docs/adr/0005-statutory-block-lifecycle-and-private-number-state-machine.md)
-* [`ADR 0006: In-Memory What-If Simulation with HMAC Commit Tokens`](file:///home/aadith/SIH/RailBlock-Aadith/docs/adr/0006-in-memory-what-if-simulation-with-commit-tokens.md)
+Key architectural decisions are documented under [`docs/adr/`](file:///Users/santhoshsl/RailBlock/docs/adr/):
+* **ADR 0001:** Two-Tier Optimization Architecture (Offline MILP + Real-Time Greedy Heuristic)
+* **ADR 0002:** Read-Only Edge Gateway & RailNet Air-Gap Security
+* **ADR 0003:** Tiered Train Detention & Zero-Tolerance VIP Timetable Protection
+* **ADR 0004:** Directional Track Possession & Flexible Internal Shadow Offsets
+* **ADR 0005:** Statutory Block Lifecycle & Station Master Private Number State Machine
+* **ADR 0006:** In-Memory What-If Simulation with HMAC Commit Tokens
 
 ---
 
