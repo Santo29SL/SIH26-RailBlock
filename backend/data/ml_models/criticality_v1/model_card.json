@@ -1,0 +1,64 @@
+{
+  "model_name": "criticality_xgboost_isotonic",
+  "version": "criticality_v1",
+  "created_at": "2026-08-28T19:49:53.291573+00:00",
+  "seed": 42,
+  "library_versions": {
+    "xgboost": "3.4.1",
+    "lightgbm": "4.7.0",
+    "scikit-learn": "1.9.0"
+  },
+  "feature_order": [
+    "tgi_deviation",
+    "speed_restriction_kmh",
+    "days_overdue",
+    "section_gmt_density",
+    "point_failure_risk",
+    "ohe_insulator_wear",
+    "usfd_flaw_severity",
+    "department_code_TRACK",
+    "department_code_SIGNAL",
+    "department_code_TRACTION"
+  ],
+  "bounds": {
+    "tgi_deviation": [
+      0.0,
+      100.0
+    ],
+    "speed_restriction_kmh": [
+      0.0,
+      120.0
+    ],
+    "days_overdue": [
+      0.0,
+      60.0
+    ],
+    "section_gmt_density": [
+      5.0,
+      150.0
+    ],
+    "point_failure_risk": [
+      0.0,
+      100.0
+    ],
+    "ohe_insulator_wear": [
+      0.0,
+      100.0
+    ],
+    "usfd_flaw_severity": [
+      0.0,
+      4.0
+    ]
+  },
+  "base_positive_rate": 0.11866666666666667,
+  "cv_splits": 5,
+  "cv_grouping": "section_id",
+  "metrics": {
+    "xgboost_pr_auc_mean": 0.22700886524273578,
+    "xgboost_pr_auc_worst": 0.20412252027681124,
+    "lightgbm_pr_auc_mean": 0.21540257139918423,
+    "lightgbm_pr_auc_worst": 0.1806798639050358
+  },
+  "disclaimer": "Trained on simulated labels only. No real IR failure data was used. Absolute CI values are not field probabilities until recalibrated on real labeled outcomes in a CRIS pilot.",
+  "artifact_sha256": "1ea8433c6bef136cb4e6b5ee2801ce8b52d4c8772bd2cb93336154e0554b7617"
+}

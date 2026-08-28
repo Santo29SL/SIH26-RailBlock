@@ -2,11 +2,11 @@
 
 Tests all acceptance criteria for Ticket 05:
 1. `reschedule_on_disruption()` signature, inputs, and `RescheduleOutcome` frozen dataclass output.
-2. Fast greedy time-shifting (<1 second) for train delays >20 minutes without global MILP re-solving.
+2. Fast greedy time-shifting (<1 second) for train delays >20 minutes without global CP-SAT re-solving.
 3. Internal shadow activity offset and duration preservation during time shifts.
 4. Statutory safety buffer absorption (<=20 minute delays) without window shifts.
 5. G&SR Chapter 5/15 Single Line Working (SLW) emergency advisory generation for block overruns (+15 min) with queued trains.
-6. Statutory SLW advisory structure (pilot train dispatch, speed limits 25/15/45 km/h, freight siding holding orders, SM Private Number).
+6. Statutory SLW advisory structure (pilot train dispatch, speed limits 25/15/40 km/h, freight siding regulation, SM Private Number).
 7. Block overrun without queued trains (overrun warning).
 8. Single line track topology (section blockade).
 9. Polymorphic input compatibility: ScheduledBlock, ScheduledBlockSummary, and raw dictionaries.
@@ -317,7 +317,7 @@ def test_reschedule_block_overrun_with_queued_trains_triggers_slw(
     # AC: Verify statutory speed limits under G&SR
     assert slw.first_pilot_speed_kmph == SLW_FIRST_PILOT_MAX_SPEED_KMPH == 25
     assert slw.facing_points_speed_kmph == SLW_FACING_POINTS_MAX_SPEED_KMPH == 15
-    assert slw.subsequent_train_speed_kmph == SLW_SUBSEQUENT_MAX_SPEED_KMPH == 45
+    assert slw.subsequent_train_speed_kmph == SLW_SUBSEQUENT_MAX_SPEED_KMPH == 40
 
     # AC: Verify freight siding holding orders
     assert len(slw.freight_siding_orders) == 2
@@ -327,13 +327,13 @@ def test_reschedule_block_overrun_with_queued_trains_triggers_slw(
     # AC: Verify pre-formatted advisory text
     adv_text = slw.advisory_text
     assert "INDIAN RAILWAYS - OPERATIONAL SAFETY ADVISORY" in adv_text
-    assert "G&SR CH 5 & CH 15" in adv_text
+    assert "GR 3.68" in adv_text
     assert "SINGLE LINE WORKING (SLW) EMERGENCY AUTHORIZATION NOTICE" in adv_text
     assert "MAS-AJJ (Chennai Central - Arakkonam)" in adv_text
     assert "PN-8421" in adv_text
     assert "25 km/h" in adv_text
     assert "15 km/h" in adv_text
-    assert "45 km/h" in adv_text
+    assert "40 km/h" in adv_text
     assert "BOXN-7741" in adv_text
     assert "Form T/351-B" in adv_text
 

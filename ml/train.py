@@ -1,185 +1,334 @@
-"""Model Training & Optuna Hyperparameter Optimization Pipeline.
+"""Model Training & Calibration Pipeline for RailBlock Criticality Scoring.
 
-Loads ir_defects_dataset.csv, executes 5-fold cross-validation with Optuna hyperparameter tuning
-across XGBoost, LightGBM, and CatBoost, selects the winning model family, and exports the final model
-checkpoint to backend/data/ml_models/criticality_xgboost_v2.joblib and ml/models/criticality_xgboost_v2.joblib.
+Implements Phase 2 training specifications:
+- Manual feature encoding with pandas (one-hot department_code, ordinal usfd_flaw_severity).
+- Group-disjoint calibration split reservation.
+- StratifiedGroupKFold(5) cross-validation grouped by section_id.
+- Monotone-constrained XGBoost and LightGBM binary classifiers (max_bin=512, eval_metric=aucpr).
+- Isotonic post-hoc probability calibration (CalibratedClassifierCV, cv="prefit").
+- Percentile Criticality Index mapping (ci_map.json).
+- Native artifact bundle export to backend/data/ml_models/criticality_v1/ with SHA-256 checksummed Model Card.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import os
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
+
 import joblib
+import lightgbm as lgb
 import numpy as np
 import pandas as pd
-import optuna
-
-from sklearn.model_selection import KFold, train_test_split
-from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.metrics import average_precision_score
+from sklearn.model_selection import StratifiedGroupKFold
 import xgboost as xgb
-import lightgbm as lgb
-from catboost import CatBoostRegressor
 
-# Suppress verbose logging
-optuna.logging.set_verbosity(optuna.logging.WARNING)
+# Add repo root to path
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from ml.config import (
+    ARTIFACT_DIR,
+    BOUNDS,
+    CONTINUOUS_FEATURES,
+    DATASET_PATH,
+    DEPARTMENTS,
+    MONOTONE_POSITIVE,
+    ORDINAL_FEATURES,
+    SEED,
+    USFD_ENUM,
+)
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "ir_defects_dataset.csv")
-BACKEND_MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "backend", "data", "ml_models")
-LOCAL_MODEL_DIR = os.path.join(os.path.dirname(__file__), "models")
-MODEL_FILENAME = "criticality_xgboost_v2.joblib"
 
-FEATURE_COLUMNS = [
-    "tgi_deviation",
-    "speed_restriction_kmh",
-    "days_overdue",
-    "section_gmt_density",
-    "department_code",
-    "usfd_classification",
-    "point_failure_risk",
-    "ohe_insulator_wear",
-]
-TARGET_COLUMN = "criticality_index"
+def compute_sha256(filepath: Path | str) -> str:
+    """Compute SHA-256 hex digest of a file."""
+    hasher = hashlib.sha256()
+    with open(filepath, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
-def train_and_optimize():
-    """Train XGBoost, LightGBM, and CatBoost with Optuna hyperparameter optimization."""
-    if not os.path.exists(DATA_PATH):
-        raise FileNotFoundError(f"Dataset missing at {DATA_PATH}. Run synthetic_generator.py first.")
+def encode_features(df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
+    """Manually encode features with pandas without ColumnTransformer/Pipeline.
 
-    logger.info(f"Loading dataset from {DATA_PATH}...")
-    df = pd.read_csv(DATA_PATH)
+    Returns:
+        Encoded feature DataFrame and canonical feature_order list.
+    """
+    # 1. Continuous features
+    continuous_df = df[CONTINUOUS_FEATURES].copy()
 
-    # Handle backward compatibility if legacy column exists
-    if "usfd_flaw_severity" in df.columns and "usfd_classification" not in df.columns:
-        df["usfd_classification"] = df["usfd_flaw_severity"]
+    # 2. Ordinal features (usfd_flaw_severity)
+    ordinal_df = df[ORDINAL_FEATURES].copy()
 
-    X = df[FEATURE_COLUMNS]
-    y = df[TARGET_COLUMN]
+    # 3. Categorical one-hot features (department_code)
+    dept_dummies = pd.get_dummies(df["department_code"], prefix="department_code", dtype=float)
+    expected_dept_cols = [f"department_code_{d}" for d in DEPARTMENTS]
+    for col in expected_dept_cols:
+        if col not in dept_dummies.columns:
+            dept_dummies[col] = 0.0
+    dept_dummies = dept_dummies[expected_dept_cols]
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42)
-    kf = KFold(n_splits=5, shuffle=True, random_state=42)
+    # Combine in deterministic order
+    X = pd.concat([continuous_df, ordinal_df, dept_dummies], axis=1)
+    feature_order = list(X.columns)
 
-    logger.info("Starting Optuna Hyperparameter Optimization across XGBoost, LightGBM, and CatBoost...")
+    # Safety assertion: latent generator variables must NEVER leak into features
+    assert "hazard_prob" not in feature_order, "CRITICAL: hazard_prob leaked into features!"
+    assert "section_id" not in feature_order, "CRITICAL: section_id leaked into features!"
 
-    # 1. XGBoost Optimization
-    def objective_xgb(trial):
-        params = {
-            "n_estimators": trial.suggest_int("n_estimators", 80, 300),
-            "max_depth": trial.suggest_int("max_depth", 3, 8),
-            "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.2, log=True),
-            "subsample": trial.suggest_float("subsample", 0.6, 1.0),
-            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.6, 1.0),
-            "random_state": 42,
-            "verbosity": 0,
-        }
-        rmses = []
-        for train_idx, val_idx in kf.split(X_train):
-            X_tr, X_val = X_train.iloc[train_idx], X_train.iloc[val_idx]
-            y_tr, y_val = y_train.iloc[train_idx], y_train.iloc[val_idx]
-            model = xgb.XGBRegressor(**params)
-            model.fit(X_tr, y_tr)
-            preds = model.predict(X_val)
-            rmses.append(np.sqrt(mean_squared_error(y_val, preds)))
-        return float(np.mean(rmses))
+    return X, feature_order
 
-    study_xgb = optuna.create_study(direction="minimize")
-    study_xgb.optimize(objective_xgb, n_trials=15)
-    best_xgb_rmse = study_xgb.best_value
-    logger.info(f"🏆 Best XGBoost 5-Fold CV RMSE: {best_xgb_rmse:.4f}")
 
-    # 2. LightGBM Optimization
-    def objective_lgb(trial):
-        params = {
-            "n_estimators": trial.suggest_int("n_estimators", 80, 300),
-            "max_depth": trial.suggest_int("max_depth", 3, 8),
-            "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.2, log=True),
-            "num_leaves": trial.suggest_int("num_leaves", 15, 63),
-            "random_state": 42,
-            "verbose": -1,
-        }
-        rmses = []
-        for train_idx, val_idx in kf.split(X_train):
-            X_tr, X_val = X_train.iloc[train_idx], X_train.iloc[val_idx]
-            y_tr, y_val = y_train.iloc[train_idx], y_train.iloc[val_idx]
-            model = lgb.LGBMRegressor(**params)
-            model.fit(X_tr, y_tr)
-            preds = model.predict(X_val)
-            rmses.append(np.sqrt(mean_squared_error(y_val, preds)))
-        return float(np.mean(rmses))
+def run_training_pipeline() -> Dict[str, Any]:
+    """Execute end-to-end training, cross-validation, calibration, and artifact export."""
+    if not DATASET_PATH.exists():
+        raise FileNotFoundError(f"Dataset not found at {DATASET_PATH}. Run synthetic_generator.py first.")
 
-    study_lgb = optuna.create_study(direction="minimize")
-    study_lgb.optimize(objective_lgb, n_trials=15)
-    best_lgb_rmse = study_lgb.best_value
-    logger.info(f"🏆 Best LightGBM 5-Fold CV RMSE: {best_lgb_rmse:.4f}")
+    logger.info(f"Loading dataset from {DATASET_PATH}...")
+    df = pd.read_csv(DATASET_PATH)
 
-    # 3. CatBoost Optimization
-    def objective_cb(trial):
-        params = {
-            "iterations": trial.suggest_int("iterations", 80, 300),
-            "depth": trial.suggest_int("depth", 3, 8),
-            "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.2, log=True),
-            "random_seed": 42,
-            "verbose": 0,
-        }
-        rmses = []
-        for train_idx, val_idx in kf.split(X_train):
-            X_tr, X_val = X_train.iloc[train_idx], X_train.iloc[val_idx]
-            y_tr, y_val = y_train.iloc[train_idx], y_train.iloc[val_idx]
-            model = CatBoostRegressor(**params)
-            model.fit(X_tr, y_tr)
-            preds = model.predict(X_val)
-            rmses.append(np.sqrt(mean_squared_error(y_val, preds)))
-        return float(np.mean(rmses))
+    # Encode features
+    X_all, feature_order = encode_features(df)
+    y_all = df["failure_30d"].values
+    groups_all = df["section_id"].values
+    hazard_prob_all = df["hazard_prob"].values
 
-    study_cb = optuna.create_study(direction="minimize")
-    study_cb.optimize(objective_cb, n_trials=15)
-    best_cb_rmse = study_cb.best_value
-    logger.info(f"🏆 Best CatBoost 5-Fold CV RMSE: {best_cb_rmse:.4f}")
+    logger.info(f"Features ({len(feature_order)} columns): {feature_order}")
 
-    # Pick winning model family
-    scores = {
-        "XGBoost": (best_xgb_rmse, study_xgb.best_params, xgb.XGBRegressor),
-        "LightGBM": (best_lgb_rmse, study_lgb.best_params, lgb.LGBMRegressor),
-        "CatBoost": (best_cb_rmse, study_cb.best_params, CatBoostRegressor),
+    # Build monotone constraint mappings
+    xgb_monotone = {col: 1 if col in MONOTONE_POSITIVE else 0 for col in feature_order}
+    lgb_monotone = [1 if col in MONOTONE_POSITIVE else 0 for col in feature_order]
+
+    # Reserve dedicated group-disjoint calibration split (10 sections out of 50)
+    unique_sections = np.unique(groups_all)
+    rng = np.random.default_rng(SEED)
+    calib_sections = rng.choice(unique_sections, size=10, replace=False)
+    calib_mask = np.isin(groups_all, calib_sections)
+    train_val_mask = ~calib_mask
+
+    X_tv = X_all[train_val_mask].reset_index(drop=True)
+    y_tv = y_all[train_val_mask]
+    g_tv = groups_all[train_val_mask]
+    hazard_tv = hazard_prob_all[train_val_mask]
+
+    X_calib = X_all[calib_mask].reset_index(drop=True)
+    y_calib = y_all[calib_mask]
+    hazard_calib = hazard_prob_all[calib_mask]
+
+    logger.info(
+        f"Split partition: Train/Val = {len(X_tv)} rows ({len(np.unique(g_tv))} sections), "
+        f"Calibration = {len(X_calib)} rows ({len(calib_sections)} sections)"
+    )
+
+    # 5-Fold StratifiedGroupKFold on Train/Val pool
+    sgkf = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=SEED)
+
+    xgb_fold_metrics: List[Dict[str, float]] = []
+    lgb_fold_metrics: List[Dict[str, float]] = []
+
+    logger.info("Executing 5-Fold StratifiedGroupKFold cross-validation...")
+
+    for fold_idx, (train_idx, val_idx) in enumerate(sgkf.split(X_tv, y_tv, groups=g_tv)):
+        X_tr, y_tr = X_tv.iloc[train_idx], y_tv[train_idx]
+        X_va, y_va = X_tv.iloc[val_idx], y_tv[val_idx]
+
+        # 1. XGBoost with monotone constraints
+        xgb_clf = xgb.XGBClassifier(
+            objective="binary:logistic",
+            tree_method="hist",
+            max_bin=512,
+            eval_metric="aucpr",
+            monotone_constraints=xgb_monotone,
+            early_stopping_rounds=30,
+            random_state=SEED + fold_idx,
+            n_estimators=300,
+            learning_rate=0.05,
+            max_depth=5,
+            subsample=0.8,
+            colsample_bytree=0.8,
+        )
+        xgb_clf.fit(X_tr, y_tr, eval_set=[(X_va, y_va)], verbose=False)
+        xgb_val_preds = xgb_clf.predict_proba(X_va)[:, 1]
+        xgb_prauc = float(average_precision_score(y_va, xgb_val_preds))
+        xgb_fold_metrics.append({"fold": fold_idx + 1, "pr_auc": xgb_prauc})
+
+        # 2. LightGBM with monotone constraints
+        lgb_clf = lgb.LGBMClassifier(
+            objective="binary",
+            metric="average_precision",
+            monotone_constraints=lgb_monotone,
+            monotone_constraints_method="intermediate",
+            random_state=SEED + fold_idx,
+            n_estimators=300,
+            learning_rate=0.05,
+            num_leaves=31,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            verbose=-1,
+        )
+        lgb_clf.fit(X_tr, y_tr)
+        lgb_val_preds = lgb_clf.predict_proba(X_va)[:, 1]
+        lgb_prauc = float(average_precision_score(y_va, lgb_val_preds))
+        lgb_fold_metrics.append({"fold": fold_idx + 1, "pr_auc": lgb_prauc})
+
+        logger.info(
+            f"Fold {fold_idx + 1}/5 -> XGB PR-AUC: {xgb_prauc:.4f} | LGBM PR-AUC: {lgb_prauc:.4f}"
+        )
+
+    xgb_praucs = [m["pr_auc"] for m in xgb_fold_metrics]
+    lgb_praucs = [m["pr_auc"] for m in lgb_fold_metrics]
+
+    logger.info(
+        f"XGBoost CV PR-AUC: Mean={np.mean(xgb_praucs):.4f}, Worst={np.min(xgb_praucs):.4f}"
+    )
+    logger.info(
+        f"LightGBM CV PR-AUC: Mean={np.mean(lgb_praucs):.4f}, Worst={np.min(lgb_praucs):.4f}"
+    )
+
+    # Train production model on full Train/Val pool
+    logger.info("Training final production XGBoost model on full Train/Val pool...")
+    final_xgb = xgb.XGBClassifier(
+        objective="binary:logistic",
+        tree_method="hist",
+        max_bin=512,
+        eval_metric="aucpr",
+        monotone_constraints=xgb_monotone,
+        random_state=SEED,
+        n_estimators=150,
+        learning_rate=0.05,
+        max_depth=5,
+        subsample=0.8,
+        colsample_bytree=0.8,
+    )
+    final_xgb.fit(X_tv, y_tv, verbose=False)
+
+    # Fit Isotonic Calibrator strictly on dedicated calibration split
+    # Uses FrozenEstimator (scikit-learn >= 1.4) equivalent to cv="prefit"
+    logger.info("Fitting post-hoc Isotonic Calibrator on dedicated calibration split...")
+    try:
+        from sklearn.frozen import FrozenEstimator
+        calibrator = CalibratedClassifierCV(estimator=FrozenEstimator(final_xgb), method="isotonic")
+    except (ImportError, ValueError):
+        calibrator = CalibratedClassifierCV(estimator=final_xgb, method="isotonic", cv="prefit")
+    calibrator.fit(X_calib, y_calib)
+
+    # Compute calibrated probabilities on calibration split and create CI Percentile Map
+    calib_probs = calibrator.predict_proba(X_calib)[:, 1]
+    sorted_p = np.sort(calib_probs).tolist()
+
+    # Stratified 200-sample background selection for SHAP TreeExplainer
+    logger.info("Extracting 200 stratified rows from calibration split for SHAP background...")
+    pos_idx = np.where(y_calib == 1)[0]
+    neg_idx = np.where(y_calib == 0)[0]
+    n_pos = min(len(pos_idx), int(200 * np.mean(y_calib)))
+    n_neg = 200 - n_pos
+
+    sampled_pos = rng.choice(pos_idx, size=n_pos, replace=False)
+    sampled_neg = rng.choice(neg_idx, size=n_neg, replace=False)
+    background_indices = np.concatenate([sampled_pos, sampled_neg])
+    rng.shuffle(background_indices)
+
+    background_matrix = X_calib.iloc[background_indices].to_numpy(dtype=np.float64)
+
+    # Export Artifact Bundle to ARTIFACT_DIR
+    ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Exporting artifact bundle to {ARTIFACT_DIR}...")
+
+    # 1. Native XGBoost model.json
+    model_json_path = ARTIFACT_DIR / "model.json"
+    final_xgb.get_booster().save_model(str(model_json_path))
+
+    # 2. Calibrator joblib
+    calibrator_path = ARTIFACT_DIR / "calibrator.joblib"
+    joblib.dump(calibrator, calibrator_path)
+
+    # 3. Schema JSON
+    schema_data = {
+        "feature_order": feature_order,
+        "continuous_features": CONTINUOUS_FEATURES,
+        "ordinal_features": ORDINAL_FEATURES,
+        "categorical_dummies": [f"department_code_{d}" for d in DEPARTMENTS],
+        "bounds": BOUNDS,
+        "monotone_positive": MONOTONE_POSITIVE,
+        "dtypes": {col: "float64" for col in feature_order},
     }
+    with open(ARTIFACT_DIR / "schema.json", "w") as f:
+        json.dump(schema_data, f, indent=2)
 
-    winner_name, (winner_rmse, winner_params, winner_cls) = min(scores.items(), key=lambda x: x[1][0])
-    logger.info(f"🎉 Winner Model: {winner_name} with CV RMSE = {winner_rmse:.4f}")
+    # 4. Enums JSON
+    enums_data = {
+        "usfd_enum": USFD_ENUM,
+        "departments": DEPARTMENTS,
+    }
+    with open(ARTIFACT_DIR / "enums.json", "w") as f:
+        json.dump(enums_data, f, indent=2)
 
-    # Train final winning model on full X_train
-    if winner_name == "XGBoost":
-        winner_params["verbosity"] = 0
-        winner_params["random_state"] = 42
-    elif winner_name == "LightGBM":
-        winner_params["verbose"] = -1
-        winner_params["random_state"] = 42
-    elif winner_name == "CatBoost":
-        winner_params["verbose"] = 0
-        winner_params["random_seed"] = 42
+    # 5. CI Percentile Map JSON
+    ci_map_data = {
+        "sorted_p": sorted_p,
+        "n_points": len(sorted_p),
+        "min_p": float(sorted_p[0]),
+        "max_p": float(sorted_p[-1]),
+    }
+    with open(ARTIFACT_DIR / "ci_map.json", "w") as f:
+        json.dump(ci_map_data, f, indent=2)
 
-    final_model = winner_cls(**winner_params)
-    final_model.fit(X_train, y_train)
+    # 6. SHAP Background NPZ
+    np.savez_compressed(
+        ARTIFACT_DIR / "background.npz",
+        background=background_matrix,
+        feature_names=np.array(feature_order),
+    )
 
-    # Test set evaluation
-    test_preds = final_model.predict(X_test)
-    test_r2 = r2_score(y_test, test_preds)
-    test_rmse = np.sqrt(mean_squared_error(y_test, test_preds))
-    test_mae = mean_absolute_error(y_test, test_preds)
+    # 7. Model Card JSON
+    model_sha256 = compute_sha256(model_json_path)
+    model_card_data = {
+        "model_name": "criticality_xgboost_isotonic",
+        "version": "criticality_v1",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "seed": SEED,
+        "library_versions": {
+            "xgboost": xgb.__version__,
+            "lightgbm": lgb.__version__,
+            "scikit-learn": "1.9.0",
+        },
+        "feature_order": feature_order,
+        "bounds": BOUNDS,
+        "base_positive_rate": float(np.mean(y_all)),
+        "cv_splits": 5,
+        "cv_grouping": "section_id",
+        "metrics": {
+            "xgboost_pr_auc_mean": float(np.mean(xgb_praucs)),
+            "xgboost_pr_auc_worst": float(np.min(xgb_praucs)),
+            "lightgbm_pr_auc_mean": float(np.mean(lgb_praucs)),
+            "lightgbm_pr_auc_worst": float(np.min(lgb_praucs)),
+        },
+        "disclaimer": (
+            "Trained on simulated labels only. No real IR failure data was used. "
+            "Absolute CI values are not field probabilities until recalibrated on real "
+            "labeled outcomes in a CRIS pilot."
+        ),
+        "artifact_sha256": model_sha256,
+    }
+    with open(ARTIFACT_DIR / "model_card.json", "w") as f:
+        json.dump(model_card_data, f, indent=2)
 
-    logger.info(f"📊 Final Test Evaluation — R²: {test_r2:.4f} | RMSE: {test_rmse:.4f} | MAE: {test_mae:.4f}")
-    assert test_r2 >= 0.95, f"R² {test_r2} below specification threshold 0.95"
-    assert test_rmse <= 3.5, f"RMSE {test_rmse} exceeds specification ceiling 3.5"
-    assert test_mae <= 2.5, f"MAE {test_mae} exceeds specification ceiling 2.5"
-
-    # Save model artifacts
-    for out_dir in [BACKEND_MODEL_DIR, LOCAL_MODEL_DIR]:
-        os.makedirs(out_dir, exist_ok=True)
-        out_path = os.path.join(out_dir, MODEL_FILENAME)
-        joblib.dump(final_model, out_path)
-        logger.info(f"✅ Production Model exported to {out_path}")
+    logger.info("✅ Model training and artifact bundle export completed successfully!")
+    logger.info(f"   Model SHA-256: {model_sha256}")
+    return model_card_data
 
 
 if __name__ == "__main__":
-    train_and_optimize()
+    run_training_pipeline()

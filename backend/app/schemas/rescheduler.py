@@ -34,14 +34,14 @@ class RescheduleActionEnum(str, enum.Enum):
 
 
 class SLWAdvisorySchema(BaseModel):
-    """Statutory Single Line Working (SLW) emergency advisory notice under Indian Railways G&SR Chapter 5/15."""
+    """Statutory Single Line Working (SLW) emergency advisory notice under Indian Railways GR 3.68, SR 4.42, SR 4.09 & SR Chapter 15."""
 
     model_config = ConfigDict(from_attributes=True)
 
     advisory_id: UUID = Field(..., description="Unique identifier for the SLW advisory notice")
     timestamp: datetime = Field(..., description="Timestamp when the SLW emergency advisory was issued")
     gsr_rule_reference: str = Field(
-        default="G&SR Chapter 5, Rule 5.15 & Chapter 15 - Single Line Working on Double Line",
+        default="GR 3.68, SR 4.42, SR 4.09 & SR Chapter 15 — Temporary Single Line Working (TSLW) on Double Line",
         description="Statutory G&SR operating rule reference",
     )
     section_code: str = Field(..., description="Section identifier code", examples=["MAS-AJJ"])
@@ -50,13 +50,13 @@ class SLWAdvisorySchema(BaseModel):
     single_line_in_use: str = Field(..., description="Operational track line assigned for bidirectional SLW", examples=["DOWN Main Line"])
     pilot_train_number: Optional[str] = Field(None, description="First pilot train authorized to traverse single line", examples=["12621"])
     pilot_train_name: Optional[str] = Field(None, description="Pilot train name", examples=["Tamil Nadu Express"])
-    first_pilot_speed_kmph: int = Field(default=25, description="Statutory maximum speed in km/h for the first pilot train under G&SR 5.15")
-    subsequent_train_speed_kmph: int = Field(default=45, description="Statutory caution speed in km/h for subsequent follow-up trains")
+    first_pilot_speed_kmph: int = Field(default=25, description="Statutory maximum speed in km/h for the first pilot train under GR 3.68 / SR 4.09")
+    subsequent_train_speed_kmph: int = Field(default=40, description="Booked speed with 40 km/h automatic wrong-direction cap for subsequent follow-up trains")
     facing_points_speed_kmph: int = Field(default=15, description="Statutory maximum speed in km/h over facing points and crossovers")
-    freight_siding_orders: List[str] = Field(default_factory=list, description="Mandatory holding and regulation orders for freight/goods rakes in sidings")
+    freight_siding_orders: List[str] = Field(default_factory=list, description="Controller decision support for regulating freight/goods rakes in sidings")
     queued_train_priorities: List[str] = Field(default_factory=list, description="Priority passenger trains queued at block stations")
     private_number: Optional[str] = Field(None, description="Station Master Private Number (PN) exchanged for SLW introduction", examples=["PN-7392"])
-    advisory_text: str = Field(..., description="Pre-formatted statutory Indian Railways telegraphic advisory notice")
+    advisory_text: str = Field(..., description="Pre-formatted statutory Indian Railways Single Line Working (SLW) operational safety advisory notice")
     td602_authority_sheet: Optional[Dict[str, Any]] = Field(None, description="Form T/D 602 Line Clear Ticket + Authority to Pass Signals + Caution Order sheet")
     controller_phone_script: Optional[str] = Field(None, description="Verbatim Section Controller control-phone dispatch script")
 

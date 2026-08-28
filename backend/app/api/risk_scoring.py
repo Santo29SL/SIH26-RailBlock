@@ -12,9 +12,8 @@ from app.schemas.risk import (
     RiskPredictionRequest,
     RiskPredictionResponse,
     SHAPExplanationSchema,
-    USFDClassificationEnum,
 )
-from app.services.ml_risk_engine import FEATURE_COLUMNS, risk_engine
+from app.services.ml_risk_engine import risk_engine
 
 router = APIRouter(prefix="/risk", tags=["Stage 2 — AI Risk & Criticality Scoring"])
 
@@ -33,15 +32,17 @@ async def predict_request_risk(req: RiskPredictionRequest) -> RiskPredictionResp
     """Predict risk score using Stage 2 ML engine."""
     try:
         req_dict = req.model_dump(by_alias=True)
-        prediction = risk_engine.predict_risk(req_dict, scoring_mode=req.scoring_mode.value)
+        mode = req.scoring_mode if isinstance(req.scoring_mode, str) else req.scoring_mode.value if req.scoring_mode else "AUTO"
+        prediction = risk_engine.predict_risk(req_dict, scoring_mode=mode)
 
         return RiskPredictionResponse(
             request_code=prediction.get("request_code"),
+            failure_probability=prediction["failure_probability"],
             criticality_index=prediction["criticality_index"],
             model_used=prediction["model_used"],
-            scoring_mode=prediction["scoring_mode"],
+            scoring_mode=prediction.get("scoring_mode"),
             shap_explanation=SHAPExplanationSchema(**prediction["shap_explanation"]),
-            extracted_features=prediction["extracted_features"],
+            extracted_features=prediction.get("extracted_features"),
         )
     except Exception as exc:
         raise HTTPException(
@@ -57,15 +58,8 @@ async def predict_request_risk(req: RiskPredictionRequest) -> RiskPredictionResp
     summary="Get Stage 2 Risk Model & SHAP Metadata",
 )
 async def get_model_info() -> ModelInfoResponse:
-    """Return model status, active mode, and feature definitions."""
-    has_model = risk_engine.model is not None
-    return ModelInfoResponse(
-        stage="Stage 2: AI Risk & Criticality Scoring Engine",
-        status="ready" if has_model else "degraded",
-        active_scoring_mode="MODE_2_ML_SHAP" if has_model else "MODE_1_DETERMINISTIC",
-        algorithm=risk_engine.algorithm_name,
-        features=FEATURE_COLUMNS,
-        supported_usfd_classes=[e.value for e in USFDClassificationEnum],
-        version=risk_engine.model_version,
-    )
+    """Return model status, active mode, and model card metadata."""
+    card = risk_engine.get_model_card()
+    return ModelInfoResponse(**card)
+
 

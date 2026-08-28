@@ -51,9 +51,21 @@ flowchart TD
 ### Module 1: Legacy Data System Ingestion Adapters (Stage 1)
 * **Files:** `backend/app/services/adapters.py`, `backend/app/api/ingestion.py`
 * **Adapters & Endpoints:**
-  1. **`TMSAdapter` (`POST /api/v1/ingest/tms`):** Ingests USFD rail flaw classifications per IRPWM standard (**Good / IMR / IMRW / OBS / OBSW**, tabulated as T1 = IMR/IMRW, T2 = OBS/OBSW), Track Geometry Index (TGI - combining Gauge, Cross-Level, Twist, Longitudinal Level, Alignment, and Curvature), and chainage km markers.
+  1. **`TMSAdapter` (`POST /api/v1/ingest/tms`):** Ingests USFD rail flaw classifications per IRPWM standard (**GOOD / IMR / IMRW / OBS / OBSW**, tabulated as T1 = IMR/IMRW, T2 = OBS/OBSW), Track Geometry Index (TGI - combining Gauge, Cross-Level, Twist, Longitudinal Level, Alignment, and Curvature), Track Curvature in degrees (`curvature_deg`), chainage km markers, and duration.
   2. **`SMMSAdapter` (`POST /api/v1/ingest/smms`):** Ingests S&T point machine failure risk score, station code, and asset ID.
   3. **`TDMSAdapter` (`POST /api/v1/ingest/tdms`):** Ingests OHE contact wire wear percentage, Substation Feeding Post (FP) identifier, and power isolation flags.
+
+---
+
+### Module 1.5: AI Risk & Criticality Scoring Engine Integration (Stage 2)
+* **Files:** `backend/app/services/ml_risk_engine.py`, `backend/app/api/risk_scoring.py`, `backend/app/schemas/risk.py`
+* **Artifact Bundle:** Loads verified bundle from `backend/data/ml_models/criticality_v1/` (`model.json`, `calibrator.joblib`, `schema.json`, `enums.json`, `ci_map.json`, `background.npz`, `model_card.json`).
+* **Two-Mode Architecture:**
+  1. **Mode 2 (Primary ML):** Monotone-constrained XGBoost/LightGBM classifier trained on simulated degradation hazard with domain randomization, calibrated via post-hoc isotonic regression, with probability-space SHAP explanations ($\text{base\_value} + \sum \phi_i \approx P(\text{failure})$) and percentile CI mapping ($CI \in [0, 100]$).
+  2. **Mode 1 (Deterministic Fallback & Baseline):** Expert-weighted linear formula calibrated to IRPWM guidelines, used when ML artifacts are missing or for ablation comparison.
+* **Endpoints:**
+  * `POST /api/v1/risk/predict`: Returns `failure_probability`, `criticality_index`, `model_used`, and probability-space `shap_explanation`.
+  * `GET /api/v1/risk/model-info`: Returns model card metadata, SHA256 hash, cross-validation metrics, and feature bounds.
 
 ---
 
@@ -122,6 +134,7 @@ flowchart TD
      $$\text{PROPOSED} \longrightarrow \text{APPROVED} \longrightarrow \text{ACTIVE (with Disconnection PN)} \longrightarrow \text{COMPLETED (with Reconnection PN \& TSR)}$$
   4. **CRIS BDMS JSON Exporter:** `GET /api/v1/blocks/{id}/export-bdms` outputs standard CRIS BDMS draft block possession payloads.
   5. **Form T/351 Notice Exporter:** `GET /api/v1/blocks/{id}/t351-notice` outputs official Disconnection Notice records with Private Number validation tokens.
+  6. **Form T/D 602 Authority Sheet Exporter:** `GET /api/v1/blocks/{id}/td602-sheet` outputs statutory Form T/D 602 Line Clear Ticket + Authority to Pass Signals at 'ON' + Caution Order support sheets with speed restrictions ($25\text{ km/h}$ pilot, $15\text{ km/h}$ facing points, booked speed subsequent) and Section Controller telephone scripts.
 
 ---
 
@@ -172,6 +185,7 @@ All endpoints are hosted under prefix `/api/v1`:
 | | `POST` | `/api/v1/blocks/{id}/transition`| Form T/351 Private Number state transition | Station Master |
 | | `GET` | `/api/v1/blocks/{id}/export-bdms`| Export CRIS BDMS JSON draft block format | Controller |
 | | `GET` | `/api/v1/blocks/{id}/t351-notice`| Export Form T/351 Disconnection Notice payload | Station Master |
+| | `GET` | `/api/v1/blocks/{id}/td602-sheet`| Export Form T/D 602 SLW authority & caution order support sheet | Station Master / Controller |
 | **Optimizer** | `POST` | `/api/v1/optimizer/run` | Execute Stages 3 $\to$ 4 $\to$ 5 solver & persist | Controller |
 | | `POST` | `/api/v1/optimizer/simulate` | In-memory What-If simulation with HMAC token | Controller |
 | | `POST` | `/api/v1/optimizer/commit-simulation`| Commit simulated schedule using HMAC token | Controller |

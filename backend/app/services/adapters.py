@@ -35,15 +35,16 @@ class LegacySystemAdapter:
         """Ingest track defect from TMS with IRPWM USFD classification and Curvature."""
         # Map USFD classification string to severity and priority
         usfd_upper = (usfd_classification or "GOOD").upper()
+        usfd_map = {"GOOD": 0, "OBS": 1, "OBSW": 2, "IMR": 3, "IMRW": 4}
         if usfd_flaw_severity is None:
-            if usfd_upper in ("IMRW", "IMR"):
-                severity = 3 if usfd_upper == "IMRW" else 2
-                prio = Priority.CRITICAL.value if usfd_upper == "IMRW" else Priority.HIGH.value
-            elif usfd_upper in ("OBSW", "OBS"):
-                severity = 2 if usfd_upper == "OBSW" else 1
-                prio = Priority.HIGH.value if usfd_upper == "OBSW" else Priority.MEDIUM.value
+            severity = usfd_map.get(usfd_upper, 0)
+            if usfd_upper == "IMRW":
+                prio = Priority.CRITICAL.value
+            elif usfd_upper in ("IMR", "OBSW"):
+                prio = Priority.HIGH.value
+            elif usfd_upper == "OBS":
+                prio = Priority.MEDIUM.value
             else:
-                severity = 0
                 prio = Priority.LOW.value
         else:
             severity = usfd_flaw_severity

@@ -49,7 +49,7 @@ BLOCK_OVERRUN_THRESHOLD_MINUTES: int = 15
 # Statutory Speed Limits under GR 3.68, SR 4.42, SR 4.09 & SR Chapter 15
 SLW_FIRST_PILOT_MAX_SPEED_KMPH: int = 25
 SLW_FACING_POINTS_MAX_SPEED_KMPH: int = 15
-SLW_SUBSEQUENT_MAX_SPEED_KMPH: int = 45  # Booked speed with caution; 40 km/h on automatic wrong-line
+SLW_SUBSEQUENT_MAX_SPEED_KMPH: int = 40  # Booked speed (40 km/h automatic wrong-direction cap)
 
 GSR_SLW_RULE_REFERENCE: str = (
     "GR 3.68, SR 4.42, SR 4.09 & SR Chapter 15 — Temporary Single Line Working (TSLW) on Double Line"
@@ -317,7 +317,7 @@ def format_slw_advisory_text(
 ) -> str:
     """Generate pre-formatted statutory Indian Railways Single Line Working (SLW) notice.
 
-    Adheres to the official telegraphic operating format mandated under G&SR Chapters 5 and 15.
+    Adheres to the official operating advisory format mandated under GR 3.68, SR 4.42, SR 4.09 & SR Chapter 15.
     """
     sec_display = f"{section_code}" + (f" ({section_name})" if section_name else "")
     div_display = (f"{division} Division, " if division else "") + (f"{zone}" if zone else "Indian Railways")
@@ -333,7 +333,7 @@ def format_slw_advisory_text(
 
     return (
         "================================================================================\n"
-        "INDIAN RAILWAYS - OPERATIONAL SAFETY ADVISORY (G&SR CH 5 & CH 15)\n"
+        "INDIAN RAILWAYS - OPERATIONAL SAFETY ADVISORY (GR 3.68, SR 4.42, SR 4.09 & SR CH 15)\n"
         "SINGLE LINE WORKING (SLW) EMERGENCY AUTHORIZATION NOTICE\n"
         "================================================================================\n"
         f"ISSUING JURISDICTION : {div_display}\n"
@@ -344,18 +344,18 @@ def format_slw_advisory_text(
         f"OPERATIONAL TRACK    : {single_line_in_use} (BIDIRECTIONAL SLW IN EFFECT)\n"
         f"STATION MASTER PN    : {pn_display}\n"
         "--------------------------------------------------------------------------------\n"
-        "1. PILOT TRAIN DISPATCH ORDER (G&SR 5.15):\n"
+        "1. PILOT TRAIN DISPATCH ORDER (GR 3.68 / SR Chapter 15):\n"
         f"   - Pilot Train Nominated : {pilot_display}\n"
         f"   - Movement Track        : {single_line_in_use} (Wrong Line Direction)\n"
         "   - Authorization         : Authority to Proceed without Line Clear (Form T/D 602 / T/A 602)\n"
         "   - Pilot Order           : Competent Railway Servant (Pilot Guard / Station Master Pilot)\n"
         "                             must accompany the first train.\n\n"
         "2. STATUTORY SPEED RESTRICTIONS (TSR / CAUTION ORDERS):\n"
-        f"   - First Pilot Train MPS              : {first_pilot_speed_kmph} km/h (Strict Ceiling)\n"
+        f"   - First Pilot Train Speed            : {first_pilot_speed_kmph} km/h (Caution Order Ceiling)\n"
         f"   - Over Facing Points & Crossovers    : {facing_points_speed_kmph} km/h\n"
-        f"   - Subsequent Follow-Up Trains        : {subsequent_train_speed_kmph} km/h (Book Speed with Caution)\n"
+        f"   - Subsequent Follow-Up Trains        : Booked Speed ({subsequent_train_speed_kmph} km/h wrong-direction cap on automatic block)\n"
         "   - Facing Points Clamping & Padlocking: Mandatory verification by Station Master.\n\n"
-        "3. FREIGHT RAKE SIDING HOLDING ORDERS:\n"
+        "3. FREIGHT REGULATION & CONTROLLER DECISION SUPPORT:\n"
         f"{siding_text}\n\n"
         "4. QUEUED PASSENGER TRAIN REGULATION & PRIORITY:\n"
         f"{queued_text}\n\n"
@@ -765,10 +765,10 @@ def reschedule_on_disruption(
     Acceptance Criteria:
     - Shifts block start/end times in <1s for live train delays >20 mins without global MILP re-solve.
     - Absorbs delays <= 20 mins into statutory safety buffers without disrupting the block schedule.
-    - Triggers Indian Railways G&SR Chapter 5/15 Single Line Working (SLW) fallback advisory
+    - Triggers Indian Railways GR 3.68, SR 4.42, SR 4.09 & SR Chapter 15 Single Line Working (SLW) fallback advisory
       for maintenance block overruns (+15 mins past granted window) with queued trains.
-    - Outputs pre-formatted statutory advisory text specifying pilot train dispatch, Temporary Speed
-      Restrictions (TSR: 25/15/45 km/h), freight rake siding holding orders, and SM Private Numbers.
+    - Outputs pre-formatted statutory advisory text specifying pilot train dispatch, Speed
+      Caps (25 km/h Pilot / 15 km/h Facing Points / Booked Speed subsequent), freight regulation advisory, and SM Private Numbers.
 
     Returns:
         RescheduleOutcome frozen dataclass.

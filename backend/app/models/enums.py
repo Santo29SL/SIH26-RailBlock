@@ -86,6 +86,7 @@ class UserRole(str, enum.Enum):
     STATION_MASTER = "STATION_MASTER"
     DEPARTMENT_ENGINEER = "DEPARTMENT_ENGINEER"
     DIVISIONAL_AUTHORITY = "DIVISIONAL_AUTHORITY"
+    """Approval of traffic blocks > 4 hours and NI works > 3 days, per Railway Board letter dated 16.06.2022 (DRM ≤ 4 hr; GM sanction for NI ≤ 3 days)."""
 
 
 RoleEnum = UserRole

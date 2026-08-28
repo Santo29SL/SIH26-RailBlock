@@ -30,9 +30,9 @@ flowchart TD
     end
 
     subgraph STAGE2 ["2. AI Risk Scoring Engine (ml/)"]
-        ML_MODEL["CatBoost / XGBoost Regressor<br/><i>R² = 0.9881 | RMSE = 2.28</i>"]
-        SHAP_ENGINE["SHAP TreeExplainer<br/><i>Game-Theoretic Feature Attribution</i>"]
-        ML_MODEL --> CI["Criticality Index (CI ∈ [0, 100])"]
+        TWO_MODE["Two-Mode Scoring Engine<br/><i>Primary: Calibrated Monotone XGBoost<br/>Fallback: Transparent Rule-Based CI</i>"]
+        SHAP_ENGINE["Probability-Space SHAP<br/><i>Interventional TreeExplainer</i>"]
+        TWO_MODE --> CI["Criticality Index (CI ∈ [0, 100])"]
         SHAP_ENGINE --> REASONING["Controller Natural Language Reasoning"]
     end
 
@@ -66,7 +66,9 @@ flowchart TD
 
     subgraph STAGE7 ["7. Statutory Exports & Interfaces"]
         T351["Form T/351 Disconnection Portal<br/><i>Station Master Private Numbers (PN)</i>"]
+        TD602["Form T/D 602 Authority Sheet<br/><i>Line Clear Ticket & Caution Order</i>"]
         BDMS["CRIS BDMS Exporter<br/><i>Official Draft Possession Requests</i>"]
+        T351 & TD602 & BDMS
     end
 
     TMS & SMMS & TDMS --> STAGE2
@@ -81,13 +83,15 @@ flowchart TD
 
 ## ⚡ Stage-by-Stage Functional Breakdown
 
-* **Stage 1 — Multi-System Data Ingestion & Adapters:** Ingests maintenance defect requisitions from **TMS** (Civil Track), **SMMS** (Signal & Telecom), **TDMS** (Traction Distribution/Electrical), and train movements from **COA**. Edge adapters (`adapters.py`) normalize incoming requisitions into uniform `MaintenanceRequest` domain objects.
-* **Stage 2 — AI Risk & Criticality Scoring Engine:** Predicts a dynamic **Criticality Index ($CI \in [0, 100]$)** using a Two-Mode Scoring Architecture: Mode 1 transparent expert-weighted linear formula (deployed) and Mode 2 gradient boosted trees (`CatBoost` / `XGBoost`) with **SHAP** feature attribution.
+* **Stage 1 — Multi-System Data Ingestion & Adapters:** Ingests maintenance defect requisitions from **TMS** (Civil Track), **SMMS** (Signal & Telecom), **TDMS** (Traction Distribution/Electrical), and train movements from **COA**. Edge adapters (`adapters.py`) normalize incoming requisitions into uniform `MaintenanceRequest` domain objects supporting standard IRPWM USFD classifications (`GOOD`, `IMR`, `IMRW`, `OBS`, `OBSW`) and Track Geometry Curvature.
+* **Stage 2 — AI Risk & Criticality Scoring Engine:** Predicts a dynamic **Criticality Index ($CI \in [0, 100]$)** using a **Two-Mode Scoring Architecture**:
+  * **Primary Deployed Model (Mode 2):** Monotone-constrained Gradient Boosted Trees (`XGBoost` / `LightGBM`) trained on simulated 30-day failure hazard outcomes with domain randomization and feature interactions, post-hoc isotonic-calibrated, and served with probability-space **SHAP** attributions.
+  * **Deterministic Fallback & Baseline (Mode 1):** A transparent expert-weighted linear formula used when model artifacts are absent and as the comparative baseline in evaluation.
 * **Stage 3 — Corridor Gap & Headway Extractor:** Analyzes COA timetables to identify unoccupied track windows ($\ge 60\text{ min}$) with statutory **$\ge 15\text{ min}$ safety headways** before and after train movements, stitching gaps across midnight rolling boundaries.
 * **Stage 4 — Joint Shadow Block Clustering:** Bundles compatible multi-department maintenance tasks occurring within $\le 10\text{ km}$ spatial bounds and Substation Feeding Post (FP) / Sectioning Post (SP) electrical power zones ($40\text{--}80\text{ km}$), strictly enforcing the **G&SR Statutory Safety Conflict Matrix**.
-* **Stage 5 — Google OR-Tools CP-SAT Optimization Solver:** Formulates a Space-Time constraint programming model. Enforces **hard zero-detention constraints for Tier 1 VIP trains (Rajdhani, Vande Bharat, Shatabdi)** while optimizing block placement, shadow overlap hours, and regional heavy machine capacity limits.
-* **Stage 6 — Real-Time Fast Rescheduler & Emergency Protocol:** Triggers sub-millisecond greedy time-shifting when live train delays exceed $20\text{ minutes}$. Automatically generates **Temporary Single Line Working (TSLW)** advisories per **GR 3.68 & zonal SR Chapters 4/15** with **Form T/D 602** support sheets.
-* **Stage 7 — Statutory Form T/351 & CRIS BDMS Exporters:** Enforces digital Station Master **Private Number (PN)** exchanges for track disconnections/reconnections and exports draft possession requests directly in official **CRIS BDMS JSON format**.
+* **Stage 5 — Google OR-Tools CP-SAT Optimization Solver:** Formulates a Space-Time constraint programming model supporting multi-horizon planning (24h tactical, 7-day weekly, 30-day master). Enforces **hard zero-detention constraints for Tier 1 VIP trains (Rajdhani, Vande Bharat, Shatabdi)** while optimizing block placement and heavy machine fleet capacity limits.
+* **Stage 6 — Real-Time Fast Rescheduler & Emergency Protocol:** Triggers sub-millisecond greedy time-shifting when live train delays exceed $20\text{ minutes}$. Automatically generates **Temporary Single Line Working (TSLW)** advisories per **GR 3.68 & zonal SR Chapters 4/15** with **Form T/D 602** support sheets and Section Controller control-phone scripts.
+* **Stage 7 — Statutory Form T/351, Form T/D 602 & CRIS BDMS Exporters:** Enforces digital Station Master **Private Number (PN)** exchanges for track disconnections/reconnections, exports Form T/D 602 TSLW authority sheets, and exports draft possession requests directly in official **CRIS BDMS JSON format**.
 
 ---
 
@@ -98,39 +102,36 @@ flowchart TD
 | Feature Name | Type | Range | Department | Domain Description |
 | :--- | :---: | :---: | :---: | :--- |
 | **`tgi_deviation`** | `float` | `0.0` -- `100.0` | Track (TMS) | Deviation from standard Track Geometry Index ($100 - \text{TGI}$) across Gauge, Cross-Level, Twist, Longitudinal Level, Alignment, and Curvature. |
-| **`speed_restriction_kmh`**| `float` | `0.0` -- `100.0` | All | Speed drop delta ($\text{MPS} - v_{\text{TSR}}$). |
+| **`speed_restriction_kmh`**| `float` | `0.0` -- `120.0` | All | Speed drop delta ($\text{MPS} - v_{\text{TSR}}$). |
 | **`days_overdue`** | `float` | `0.0` -- `60.0` | All | Days elapsed past statutory maintenance deadline. |
 | **`section_gmt_density`** | `float` | `5.0` -- `150.0` | All | Annual Gross Million Tonnes carried by section (traffic density). |
-| **`department_code`** | `int` | `0, 1, 2` | All | `0`: Track (TMS), `1`: Signal (SMMS), `2`: Traction (TDMS). |
-| **`usfd_classification`** | `str` / `int` | `Good, OBS, OBSW, IMR, IMRW` | Track (TMS) | Ultrasonic Flaw Detection category per IRPWM (T1 = IMR/IMRW, T2 = OBS/OBSW). |
+| **`department_code`** | `str` / `int` | `TRACK`, `SIGNAL`, `TRACTION` | All | Department identifier. |
+| **`usfd_flaw_severity`** | `str` / `int` | `Good (0)`, `OBS (1)`, `OBSW (2)`, `IMR (3)`, `IMRW (4)` | Track (TMS) | Ultrasonic Flaw Detection category per IRPWM (T1 = IMR/IMRW, T2 = OBS/OBSW). |
 | **`point_failure_risk`** | `float` | `0.0` -- `100.0` | Signal (SMMS) | S&T Point machine locking latency failure risk ($>4.5\text{s}$). |
 | **`ohe_insulator_wear`** | `float` | `0.0` -- `100.0` | Traction (TDMS) | OHE contact wire wear percentage ($>20\text{--}30\%$ limit). |
 
 ---
 
-### 🔬 ML Models & Mathematical Theory
+### 🔬 ML Models & Evaluation Protocol
 
-#### 1. XGBoost (Extreme Gradient Boosting)
-* **Mathematical Theory:** Minimizes a regularized objective function using a 2nd-order Taylor expansion:
-$$\mathcal{L}^{(t)} = \sum_{i=1}^n l\left(y_i, \hat{y}_i^{(t-1)} + f_t(x_i)\right) + \gamma T + \frac{1}{2}\lambda \sum_{j=1}^T w_j^2$$
-* **Implementation & Results:** Optimized via Optuna in `ml/train.py`. Achieved 5-fold CV RMSE of **`2.6322`**.
+#### 1. Binary Maintenance Prioritization & Label Design
+* **Synthetic Hazard Simulation:** Labels represent simulated 30-day failure outcomes: $\text{failure\_30d} \sim \text{Bernoulli}\left(\sigma(\text{logit\_base} + \sum \beta_k f_k + \sum \gamma_{ij} \text{interaction}_{ij})\right)$ with domain randomization across 50 latent railway section regimes and configurable label noise (2–5%).
+* **Non-Linear Interactions:** Incorporates domain physics including `usfd_flaw_severity × section_gmt_density`, `ohe_insulator_wear × section_gmt_density`, and `point_failure_risk × days_overdue`.
 
-#### 2. LightGBM (Light Gradient Boosting Machine)
-* **Mathematical Theory:** Uses **Leaf-wise (best-first)** tree growth and **Gradient-based One-Side Sampling (GOSS)** to inspect instances with larger gradients.
-* **Implementation & Results:** Evaluated in Optuna study. Achieved 5-fold CV RMSE of **`2.7775`**.
+#### 2. Cross-Validation & Calibration Benchmark
+* **Stratified Group K-Fold:** Evaluated via 5-fold `StratifiedGroupKFold` grouped by `section_id`, reserving a dedicated group-disjoint split exclusively for post-hoc Isotonic Calibration (`CalibratedClassifierCV`).
+* **Evaluation Metrics:**
+  * **PR-AUC (Headline Ranking Metric):** `0.2270` (Mean) / `0.2041` (Worst Fold).
+  * **Precision@25:** `19.4%` (outperforming v1 rule baseline by `+0.9%` absolute).
+  * **NDCG@25:** `0.9243` ranking fidelity against true hazard probabilities.
+  * **Spearman $\rho$:** `0.8905` rank correlation.
+* **Robustness:** Evaluated under heavy-freight covariate shift (`PR-AUC 0.7242`) and label noise degradation (98.9% rank retention under 5% noise).
 
-#### 3. CatBoost (Categorical Boosting) — 🏆 Winning Model
-* **Mathematical Theory:** Employs **Ordered Boosting** to prevent target leakage and **Symmetric (Oblivious) Trees** where every node at a given level uses the exact same split condition.
-* **Final Test Evaluation Metrics:**
-  * **$R^2 \text{ Score} = 0.9881$** (Target: $\ge 0.95$) ✅
-  * **$\text{RMSE} = 2.2866$** (Target: $\le 3.5$) ✅
-  * **$\text{MAE} = 1.7358$** (Target: $\le 2.5$) ✅
-* Model Artifact: `backend/data/ml_models/criticality_xgboost_v2.joblib`
-
-#### 4. SHAP (SHapley Additive exPlanations)
-* **Mathematical Theory:** Game-theoretic feature attributions computing exact marginal contributions across feature subsets $S$:
-$$\phi_i(x) = \sum_{S \subseteq F \setminus \{i\}} \frac{|S|!(|F| - |S| - 1)!}{|F|!} \left[ f\left(S \cup \{i\}\right) - f(S) \right]$$
-* **Output:** Generates human-readable controller reasonings (e.g., *"Job rated 88.4/100 [CRITICAL] primarily driven by USFD Ultrasonic Rail Flaw (+36.5 pts)"*). Diagnostic plots saved in `ml/reports/`.
+#### 3. Probability-Space SHAP Explainability
+* **Interventional TreeExplainer:** Built once on startup using a 200-sample background distribution:
+  $$\text{base\_value} + \sum_{i=1}^M \phi_i \approx P(\text{failure}_{30d})$$
+* **Human-Readable Natural Language Reasoning:**
+  > *"Base failure rate 8%. USFD IMR flaw +21 pts, 80 km/h TSR +14, 14 days overdue +9, heavy-freight section +6, TGI deviation +3 → 61% simulated 30-day failure probability; CI 88 = riskier than 88% of the current backlog."*
 
 ---
 
@@ -144,26 +145,32 @@ SIH26-RailBlock/
 │   │   ├── api/                 # FastAPI REST Endpoint Routers (auth, blocks, optimizer, risk, events)
 │   │   ├── core/                # System config, Async SQLAlchemy, JWT & 4+1-Tier RBAC
 │   │   ├── models/              # SQLAlchemy 2.0 async database ORM models (9 tables)
-│   │   ├── schemas/             # Pydantic v2 validation & response contracts
-│   │   ├── services/            # Pure computational engines (gap_extractor, clustering, optimizer, rescheduler)
+│   │   ├── schemas/             # Pydantic v2 validation contracts with domain bounds
+│   │   ├── services/            # Pure computational engines (gap_extractor, clustering, optimizer, rescheduler, ml_risk_engine)
 │   │   └── main.py              # Application factory, rate limiting & logging middleware
 │   ├── data/
 │   │   ├── raw/                 # Synthetic Seed Sandbox calibrated to published IR statistics
-│   │   ├── ml_models/           # Exported production models (criticality_xgboost_v2.joblib)
+│   │   ├── ml_models/
+│   │   │   └── criticality_v1/  # Production ML artifact bundle (model.json, calibrator, schema, enums, ci_map, background, model_card)
 │   │   └── seed_all.py          # Database seeder script
-│   ├── tests/                   # Automated pytest suite (111 passing tests)
+│   ├── tests/                   # Automated pytest suite (116 passing tests)
 │   ├── Dockerfile               # Multi-stage production container configuration
 │   ├── entrypoint.sh            # Auto-migration + seed + server startup script
 │   └── requirements.txt         # Production backend dependencies
 │
 ├── ml/                          # Dedicated Offline AI/ML Development Workspace
+│   ├── config.py                # Global seed, feature definitions, domain bounds & v1 rule weights
 │   ├── data/
-│   │   ├── synthetic_generator.py # Domain-grounded IR dataset generator (6,000 samples)
+│   │   ├── synthetic_generator.py # Hazard-based IR dataset generator (6,000 samples)
 │   │   └── ir_defects_dataset.csv # Output synthetic dataset
-│   ├── reports/                 # Diagnostic plots (feature_importance.png, shap_beeswarm_summary.png)
-│   ├── train.py                 # Optuna hyperparameter tuning (XGBoost, LightGBM, CatBoost)
-│   ├── evaluate.py              # Benchmark evaluation (R², RMSE, MAE) & diagnostic report generator
-│   ├── explainer.py             # SHAP TreeExplainer & controller reasoning string builder
+│   ├── reports/
+│   │   ├── eval_report.md       # Comprehensive evaluation benchmark & calibration report
+│   │   ├── feature_importance.png # Feature importance diagnostic plot
+│   │   └── shap_beeswarm_summary.png # SHAP beeswarm diagnostic plot
+│   ├── train.py                 # Monotone XGBoost/LightGBM training with SGKF & Isotonic Calibration
+│   ├── evaluate.py              # Ranking evaluation (PR-AUC, P@K, NDCG@K, Spearman, Shift, Noise)
+│   ├── explainer.py             # Probability-space SHAP TreeExplainer & reasoning generator
+│   ├── tests/                   # ML test suite (9 passing tests: additivity, monotonicity, bounds, fallback, leakage)
 │   └── requirements-ml.txt      # Dedicated ML dependencies
 │
 ├── frontend/                    # Control Office Application SPA (React + Vite + TailwindCSS)
@@ -227,14 +234,30 @@ This automatically:
 | `/api/v1/sections` | `GET` | Retrieve list of railway sections with station markers |
 | `/api/v1/train-movements` | `GET` | List timetabled train movements on a specific section |
 | `/api/v1/maintenance` | `GET` | List pending maintenance requests across Track, Signal, and Traction |
-| `/api/v1/optimizer/run` | `POST` | Execute Stage 3 $\to$ 4 $\to$ 5 solver and persist scheduled blocks |
+| `/api/v1/optimizer/run` | `POST` | Execute Stage 3 $\to$ 4 $\to$ 5 solver across 24h, 7-day, or 30-day horizons |
 | `/api/v1/optimizer/simulate` | `POST` | Pure in-memory What-If scenario simulation with HMAC commit token |
 | `/api/v1/optimizer/commit-simulation` | `POST` | Commit simulated schedule to DB using verified HMAC token |
 | `/api/v1/blocks/{id}/transition` | `POST` | Form T/351 Private Number exchange state machine transition |
 | `/api/v1/blocks/{id}/export-bdms` | `GET` | Export approved block in official CRIS BDMS draft JSON format |
 | `/api/v1/blocks/{id}/t351-notice` | `GET` | Export statutory Form T/351 Disconnection Notice payload |
-| `/api/v1/risk/predict` | `POST` | Predict Criticality Index ($CI \in [0, 100]$) and SHAP factor attribution |
+| `/api/v1/blocks/{id}/td602-sheet` | `GET` | Export statutory Form T/D 602 TSLW line clear authority and caution order support sheet |
+| `/api/v1/risk/predict` | `POST` | Predict failure probability, Criticality Index ($CI \in [0, 100]$), and SHAP attribution |
+| `/api/v1/risk/model-info` | `GET` | Retrieve active model card metadata, training parameters, bounds, and SHA-256 digest |
 | `/api/v1/events/ws/telemetry` | `WS` | WebSocket live train delay & SLW broadcast stream |
+
+---
+
+## 🧪 Verification & Test Suite
+
+All unit and integration tests are verified across the ML workspace and backend core:
+```bash
+# 1. Run ML tests (additivity, monotonicity, bounds, fallback, leakage)
+uv run pytest ml/tests/ -v
+
+# 2. Run Backend tests (auth, optimizer, clustering, rescheduler, ingestion, blocks)
+cd backend && uv run pytest -v
+```
+**Total:** **125 / 125 tests passing (100% success)**.
 
 ---
 

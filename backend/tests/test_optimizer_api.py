@@ -519,7 +519,7 @@ async def test_optimizer_reschedule_block_overrun_slw_advisory(client: AsyncClie
     assert data["slw_advisory"] is not None
     assert data["slw_advisory"]["first_pilot_speed_kmph"] == 25
     assert data["slw_advisory"]["facing_points_speed_kmph"] == 15
-    assert data["slw_advisory"]["subsequent_train_speed_kmph"] == 45
+    assert data["slw_advisory"]["subsequent_train_speed_kmph"] == 40
     assert "SINGLE LINE WORKING" in data["slw_advisory"]["advisory_text"]
 
 

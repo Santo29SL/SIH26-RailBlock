@@ -1,0 +1,81 @@
+{
+  "feature_order": [
+    "tgi_deviation",
+    "speed_restriction_kmh",
+    "days_overdue",
+    "section_gmt_density",
+    "point_failure_risk",
+    "ohe_insulator_wear",
+    "usfd_flaw_severity",
+    "department_code_TRACK",
+    "department_code_SIGNAL",
+    "department_code_TRACTION"
+  ],
+  "continuous_features": [
+    "tgi_deviation",
+    "speed_restriction_kmh",
+    "days_overdue",
+    "section_gmt_density",
+    "point_failure_risk",
+    "ohe_insulator_wear"
+  ],
+  "ordinal_features": [
+    "usfd_flaw_severity"
+  ],
+  "categorical_dummies": [
+    "department_code_TRACK",
+    "department_code_SIGNAL",
+    "department_code_TRACTION"
+  ],
+  "bounds": {
+    "tgi_deviation": [
+      0.0,
+      100.0
+    ],
+    "speed_restriction_kmh": [
+      0.0,
+      120.0
+    ],
+    "days_overdue": [
+      0.0,
+      60.0
+    ],
+    "section_gmt_density": [
+      5.0,
+      150.0
+    ],
+    "point_failure_risk": [
+      0.0,
+      100.0
+    ],
+    "ohe_insulator_wear": [
+      0.0,
+      100.0
+    ],
+    "usfd_flaw_severity": [
+      0.0,
+      4.0
+    ]
+  },
+  "monotone_positive": [
+    "tgi_deviation",
+    "speed_restriction_kmh",
+    "days_overdue",
+    "section_gmt_density",
+    "point_failure_risk",
+    "ohe_insulator_wear",
+    "usfd_flaw_severity"
+  ],
+  "dtypes": {
+    "tgi_deviation": "float64",
+    "speed_restriction_kmh": "float64",
+    "days_overdue": "float64",
+    "section_gmt_density": "float64",
+    "point_failure_risk": "float64",
+    "ohe_insulator_wear": "float64",
+    "usfd_flaw_severity": "float64",
+    "department_code_TRACK": "float64",
+    "department_code_SIGNAL": "float64",
+    "department_code_TRACTION": "float64"
+  }
+}
