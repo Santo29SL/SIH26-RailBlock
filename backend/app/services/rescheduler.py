@@ -2,10 +2,10 @@
 
 Stage 6 Algorithmic Core for RailBlock (SIH PS 26027).
 
-Performs event-driven greedy heuristic time-shifting (<1s) for live train delays >20 mins
-without re-solving the global Google OR-Tools MILP, and automatically generates statutory
-Single Line Working (SLW) emergency advisory notices under Indian Railways General and
-Subsidiary Rules (G&SR) Chapter 5/15 when an active maintenance block overruns with queued
+Performs event-driven greedy heuristic time-shifting (<1 ms) for live train delays >20 mins
+without re-solving the global Google OR-Tools CP-SAT model, and automatically generates statutory
+Temporary Single Line Working (TSLW) emergency advisory notices and Form T/D 602 support sheets under Indian Railways General and
+Subsidiary Rules (GR 3.68 & Zonal SR Chapter 4/15) when an active maintenance block overruns with queued
 passenger trains.
 
 Canonical domain terminology strictly follows CONTEXT.md:
@@ -46,14 +46,68 @@ DEFAULT_SAFETY_BUFFER_MINUTES: int = 15
 TRAIN_DELAY_THRESHOLD_MINUTES: int = 20
 BLOCK_OVERRUN_THRESHOLD_MINUTES: int = 15
 
-# Statutory Speed Limits under G&SR Chapter 5 (Rule 5.15) & Chapter 15
+# Statutory Speed Limits under GR 3.68, SR 4.42, SR 4.09 & SR Chapter 15
 SLW_FIRST_PILOT_MAX_SPEED_KMPH: int = 25
 SLW_FACING_POINTS_MAX_SPEED_KMPH: int = 15
-SLW_SUBSEQUENT_MAX_SPEED_KMPH: int = 45
+SLW_SUBSEQUENT_MAX_SPEED_KMPH: int = 40  # Booked speed (40 km/h automatic wrong-direction cap)
 
 GSR_SLW_RULE_REFERENCE: str = (
-    "G&SR Chapter 5 (Rule 5.15) & Chapter 15 - Introduction of Single Line Working on Double Line"
+    "GR 3.68, SR 4.42, SR 4.09 & SR Chapter 15 — Temporary Single Line Working (TSLW) on Double Line"
 )
+
+
+def generate_td602_authority_sheet(
+    section_code: str,
+    section_name: Optional[str],
+    obstructed_line: str,
+    single_line_in_use: str,
+    pilot_train_number: str,
+    private_number: str,
+    timestamp: datetime,
+    division: Optional[str] = "Chennai",
+    zone: Optional[str] = "Southern Railway",
+) -> Dict[str, Any]:
+    """Generate structured Form T/D 602 Authority to Proceed without Line Clear & Caution Order sheet."""
+    station_code = section_code.split("-")[0] if "-" in section_code else section_code
+    return {
+        "form_name": "Form T/D 602",
+        "form_title": "AUTHORITY FOR TEMPORARY SINGLE LINE WORKING ON DOUBLE LINE SECTION",
+        "statutory_rule": "GR 3.68, SR 4.42, SR 4.09 & SR Chapter 15",
+        "division": division or "Chennai",
+        "zone": zone or "Southern Railway",
+        "section_code": section_code,
+        "section_name": section_name or "Block Section",
+        "date_time": timestamp.strftime("%Y-%m-%d %H:%M:%S IST"),
+        "line_obstructed": obstructed_line,
+        "line_in_use": single_line_in_use,
+        "pilot_train_number": pilot_train_number,
+        "station_master_private_number": private_number,
+        "part_1_line_clear_ticket": f"Line Clear confirmed on {single_line_in_use} with Station Master PN {private_number}.",
+        "part_2_authority_to_pass_signals_at_on": f"Driver authorized to pass Starter and Advanced Starter Signals at 'ON' into {single_line_in_use}.",
+        "part_3_caution_order": {
+            "pilot_train_speed": "25 km/h (Day/Night pilot speed ceiling)",
+            "facing_points_speed": "15 km/h over all facing points and crossovers",
+            "subsequent_train_speed": "Booked Speed (40 km/h cap if wrong direction on Automatic Block)",
+            "clamping_padlocking_mandate": "All points leading to single line must be correctly set, clamped, and padlocked (SR 4.09).",
+        },
+    }
+
+
+def generate_controller_phone_script(
+    section_code: str,
+    obstructed_line: str,
+    single_line_in_use: str,
+    pilot_train_number: str,
+    private_number: str,
+) -> str:
+    """Generate verbatim Section Controller control-phone dispatch script for SLW."""
+    return (
+        f"[CONTROL PHONE SCRIPT - SECTION CONTROLLER TO ALL STATIONS {section_code}]\n"
+        f"'ALL CONCERNED STATIONS TAKE NOTE: Maintenance block on {obstructed_line} has overran.\n"
+        f"Temporary Single Line Working (TSLW) introduced on {single_line_in_use} under GR 3.68 and SR Chapter 15.\n"
+        f"First Pilot Train is {pilot_train_number}, authorised under Form T/D 602 with Station Master PN {private_number}.\n"
+        f"Speed: 25 km/h for first pilot train, 15 km/h over facing points. Regulate all freight in station sidings.'"
+    )
 
 
 # ── Action Classification Enum ───────────────────────────────
@@ -75,7 +129,7 @@ class RescheduleAction(str, enum.Enum):
 
 @dataclass(frozen=True)
 class SLWAdvisory:
-    """Statutory Single Line Working (SLW) emergency advisory under G&SR Chapter 5/15.
+    """Statutory Single Line Working (SLW) emergency advisory under GR 3.68, SR 4.42, SR 4.09 & SR Chapter 15.
 
     Issued when an active maintenance possession overruns and delays queued trains,
     authorizing pilot-protected bidirectional train movement on the parallel line.
@@ -97,6 +151,8 @@ class SLWAdvisory:
     queued_train_priorities: List[str] = field(default_factory=list)
     private_number: Optional[str] = None
     advisory_text: str = ""
+    td602_authority_sheet: Optional[Dict[str, Any]] = None
+    controller_phone_script: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert SLWAdvisory to standard dictionary representation."""
@@ -117,6 +173,8 @@ class SLWAdvisory:
             "queued_train_priorities": list(self.queued_train_priorities),
             "private_number": self.private_number,
             "advisory_text": self.advisory_text,
+            "td602_authority_sheet": self.td602_authority_sheet,
+            "controller_phone_script": self.controller_phone_script,
         }
 
 
@@ -259,7 +317,7 @@ def format_slw_advisory_text(
 ) -> str:
     """Generate pre-formatted statutory Indian Railways Single Line Working (SLW) notice.
 
-    Adheres to the official telegraphic operating format mandated under G&SR Chapters 5 and 15.
+    Adheres to the official operating advisory format mandated under GR 3.68, SR 4.42, SR 4.09 & SR Chapter 15.
     """
     sec_display = f"{section_code}" + (f" ({section_name})" if section_name else "")
     div_display = (f"{division} Division, " if division else "") + (f"{zone}" if zone else "Indian Railways")
@@ -275,7 +333,7 @@ def format_slw_advisory_text(
 
     return (
         "================================================================================\n"
-        "INDIAN RAILWAYS - OPERATIONAL SAFETY ADVISORY (G&SR CH 5 & CH 15)\n"
+        "INDIAN RAILWAYS - OPERATIONAL SAFETY ADVISORY (GR 3.68, SR 4.42, SR 4.09 & SR CH 15)\n"
         "SINGLE LINE WORKING (SLW) EMERGENCY AUTHORIZATION NOTICE\n"
         "================================================================================\n"
         f"ISSUING JURISDICTION : {div_display}\n"
@@ -286,18 +344,18 @@ def format_slw_advisory_text(
         f"OPERATIONAL TRACK    : {single_line_in_use} (BIDIRECTIONAL SLW IN EFFECT)\n"
         f"STATION MASTER PN    : {pn_display}\n"
         "--------------------------------------------------------------------------------\n"
-        "1. PILOT TRAIN DISPATCH ORDER (G&SR 5.15):\n"
+        "1. PILOT TRAIN DISPATCH ORDER (GR 3.68 / SR Chapter 15):\n"
         f"   - Pilot Train Nominated : {pilot_display}\n"
         f"   - Movement Track        : {single_line_in_use} (Wrong Line Direction)\n"
         "   - Authorization         : Authority to Proceed without Line Clear (Form T/D 602 / T/A 602)\n"
         "   - Pilot Order           : Competent Railway Servant (Pilot Guard / Station Master Pilot)\n"
         "                             must accompany the first train.\n\n"
         "2. STATUTORY SPEED RESTRICTIONS (TSR / CAUTION ORDERS):\n"
-        f"   - First Pilot Train MPS              : {first_pilot_speed_kmph} km/h (Strict Ceiling)\n"
+        f"   - First Pilot Train Speed            : {first_pilot_speed_kmph} km/h (Caution Order Ceiling)\n"
         f"   - Over Facing Points & Crossovers    : {facing_points_speed_kmph} km/h\n"
-        f"   - Subsequent Follow-Up Trains        : {subsequent_train_speed_kmph} km/h (Book Speed with Caution)\n"
+        f"   - Subsequent Follow-Up Trains        : Booked Speed ({subsequent_train_speed_kmph} km/h wrong-direction cap on automatic block)\n"
         "   - Facing Points Clamping & Padlocking: Mandatory verification by Station Master.\n\n"
-        "3. FREIGHT RAKE SIDING HOLDING ORDERS:\n"
+        "3. FREIGHT REGULATION & CONTROLLER DECISION SUPPORT:\n"
         f"{siding_text}\n\n"
         "4. QUEUED PASSENGER TRAIN REGULATION & PRIORITY:\n"
         f"{queued_text}\n\n"
@@ -501,7 +559,7 @@ def apply_greedy_time_shift(
 ) -> ScheduledBlock:
     """Apply greedy time-shifting to a ScheduledBlock and all internal shadow activities.
 
-    Runs in microseconds (<1ms) without re-solving the global MILP solver.
+    Runs in microseconds (<1ms) without re-solving the global CP-SAT model.
     Preserves all activity relative start/end offsets and durations.
     """
     new_start_dt = block.start_datetime + timedelta(minutes=shift_minutes)
@@ -636,6 +694,26 @@ def generate_slw_advisory(
         zone=zone,
     )
 
+    td602 = generate_td602_authority_sheet(
+        section_code=section_code,
+        section_name=section_name,
+        obstructed_line=obstructed,
+        single_line_in_use=single_in_use,
+        pilot_train_number=pilot_train_number or "12621",
+        private_number=pn_str,
+        timestamp=timestamp,
+        division=division or "Chennai",
+        zone=zone or "Southern Railway",
+    )
+
+    script = generate_controller_phone_script(
+        section_code=section_code,
+        obstructed_line=obstructed,
+        single_line_in_use=single_in_use,
+        pilot_train_number=pilot_train_number or "12621",
+        private_number=pn_str,
+    )
+
     return SLWAdvisory(
         advisory_id=uuid4(),
         timestamp=timestamp,
@@ -653,6 +731,8 @@ def generate_slw_advisory(
         queued_train_priorities=queued_list,
         private_number=pn_str,
         advisory_text=advisory_txt,
+        td602_authority_sheet=td602,
+        controller_phone_script=script,
     )
 
 
@@ -683,12 +763,12 @@ def reschedule_on_disruption(
     """Evaluate a live disruption and execute real-time rescheduling or SLW fallback.
 
     Acceptance Criteria:
-    - Shifts block start/end times in <1s for live train delays >20 mins without global MILP re-solve.
+    - Shifts block start/end times in <1s for live train delays >20 mins without global CP-SAT re-solve.
     - Absorbs delays <= 20 mins into statutory safety buffers without disrupting the block schedule.
-    - Triggers Indian Railways G&SR Chapter 5/15 Single Line Working (SLW) fallback advisory
+    - Triggers Indian Railways GR 3.68, SR 4.42, SR 4.09 & SR Chapter 15 Single Line Working (SLW) fallback advisory
       for maintenance block overruns (+15 mins past granted window) with queued trains.
-    - Outputs pre-formatted statutory advisory text specifying pilot train dispatch, Temporary Speed
-      Restrictions (TSR: 25/15/45 km/h), freight rake siding holding orders, and SM Private Numbers.
+    - Outputs pre-formatted statutory advisory text specifying pilot train dispatch, Speed
+      Caps (25 km/h Pilot / 15 km/h Facing Points / Booked Speed subsequent), freight regulation advisory, and SM Private Numbers.
 
     Returns:
         RescheduleOutcome frozen dataclass.
@@ -824,7 +904,7 @@ def reschedule_on_disruption(
 
         notes = [
             f"Train {trn_display} delayed by {delay_minutes} mins (> {TRAIN_DELAY_THRESHOLD_MINUTES} min threshold).",
-            "Greedy time-shift applied without global MILP re-solve.",
+            "Greedy time-shift applied without global CP-SAT re-solve.",
             f"Block schedule shifted from {block.start_time.strftime('%H:%M')}–{block.end_time.strftime('%H:%M')} "
             f"to {shifted.start_time.strftime('%H:%M')}–{shifted.end_time.strftime('%H:%M')}.",
             f"All {len(shifted.activities)} internal shadow activities preserved with original durations and relative offsets.",

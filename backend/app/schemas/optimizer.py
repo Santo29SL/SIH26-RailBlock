@@ -57,8 +57,8 @@ class OptimizerRunRequest(BaseModel):
     horizon_days: int = Field(
         default=1,
         ge=1,
-        le=7,
-        description="Rolling planning horizon in days (1-7 days)",
+        le=30,
+        description="Rolling planning horizon in days (1-30 days)",
     )
     safety_buffer_minutes: Optional[int] = Field(
         default=None,
@@ -460,3 +460,31 @@ class FormT351NoticePayload(BaseModel):
         description="Disconnection state: DISCONNECTED, RECONNECTED, or ACKNOWLEDGED",
         examples=["DISCONNECTED"],
     )
+
+
+class FormTD602CautionOrder(BaseModel):
+    pilot_train_speed: str = "25 km/h (Day/Night pilot speed ceiling)"
+    facing_points_speed: str = "15 km/h over all facing points and crossovers"
+    subsequent_train_speed: str = "Booked Speed (40 km/h cap if wrong direction on Automatic Block)"
+    clamping_padlocking_mandate: str = "All points leading to single line must be correctly set, clamped, and padlocked (SR 4.09)."
+
+
+class FormTD602SheetPayload(BaseModel):
+    """Statutory Form T/D 602 Authority for Single Line Working."""
+
+    form_name: str = "Form T/D 602"
+    form_title: str = "AUTHORITY FOR TEMPORARY SINGLE LINE WORKING ON DOUBLE LINE SECTION"
+    statutory_rule: str = "GR 3.68, SR 4.42, SR 4.09 & SR Chapter 15"
+    division: str
+    zone: str
+    section_code: str
+    section_name: str
+    date_time: str
+    line_obstructed: str
+    line_in_use: str
+    pilot_train_number: str
+    station_master_private_number: str
+    part_1_line_clear_ticket: str
+    part_2_authority_to_pass_signals_at_on: str
+    part_3_caution_order: FormTD602CautionOrder
+    controller_phone_script: str

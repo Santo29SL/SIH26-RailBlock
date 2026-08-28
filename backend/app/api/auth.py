@@ -147,6 +147,13 @@ async def seed_demo_users(db: AsyncSession = Depends(get_db)):
             "role": UserRole.DEPARTMENT_ENGINEER.value,
             "department": "TRACK",
         },
+        {
+            "username": "drm_mas",
+            "email": "drm_mas@railblock.dev",
+            "password": "Password123!",
+            "role": UserRole.DIVISIONAL_AUTHORITY.value,
+            "department": "OPERATIONS",
+        },
     ]
 
     created = 0

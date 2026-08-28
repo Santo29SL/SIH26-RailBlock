@@ -5,6 +5,7 @@ __pycache__/
 
 # Virtual environments
 venv/
+.venv
 .venv/
 env/
 .env
@@ -65,10 +66,12 @@ docs/ticket/
 # Data files (raw downloads — don't commit large datasets)
 data/raw/
 
-# ML models (too large for git)
+# ML models & training artifacts (too large for git)
 ml/models/*.joblib
 ml/models/*.pkl
 ml/data/*.csv
+catboost_info/
+ml/catboost_info/
 
 # Jupyter
 .ipynb_checkpoints/

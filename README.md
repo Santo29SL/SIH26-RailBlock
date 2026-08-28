@@ -14,7 +14,7 @@ Railway infrastructure maintenance across Indian Railways operates across three 
 
 Independent departmental corridor possessions cause repeated solo track closures, passenger train detentions, and diminished network capacity.
 
-**RailBlock** is a centralized decision-support and constraint-optimization platform that coordinates multi-departmental maintenance requests, identifies continuous traffic downtime gaps, bundles compatible tasks into **Joint Shadow Blocks**, and solves optimal schedules using **Google OR-Tools Mixed-Integer Linear Programming (MILP)** while strictly enforcing **G&SR statutory safety rules** and protecting high-priority passenger corridors (Rajdhani, Vande Bharat, Shatabdi).
+**RailBlock** is a centralized decision-support and constraint-optimization platform that coordinates multi-departmental maintenance requests, identifies continuous traffic downtime gaps, bundles compatible tasks into **Joint Shadow Blocks**, and solves optimal schedules using **Google OR-Tools Constraint Programming (CP-SAT)** while strictly enforcing **G&SR statutory safety rules** and protecting high-priority passenger corridors (Rajdhani, Vande Bharat, Shatabdi).
 
 ---
 
@@ -26,13 +26,13 @@ flowchart TD
         TMS["Track Management System (TMS)<br/><i>Track Geometry, USFD Flaws</i>"]
         SMMS["Signal Maintenance System (SMMS)<br/><i>Point Latencies, Track Circuits</i>"]
         TDMS["Traction Distribution System (TDMS)<br/><i>OHE Wire Wear, FP/SP Zones</i>"]
-        COA["Control Office Application (COA)<br/><i>8,000+ IR Train Timetables</i>"]
+        COA["Control Office Application (COA)<br/><i>Train Timetables & Freight Forecast</i>"]
     end
 
     subgraph STAGE2 ["2. AI Risk Scoring Engine (ml/)"]
-        ML_MODEL["CatBoost / XGBoost Regressor<br/><i>R² = 0.9881 | RMSE = 2.28</i>"]
-        SHAP_ENGINE["SHAP TreeExplainer<br/><i>Game-Theoretic Feature Attribution</i>"]
-        ML_MODEL --> CI["Criticality Index (CI ∈ [0, 100])"]
+        TWO_MODE["Two-Mode Scoring Engine<br/><i>Primary: Calibrated Monotone XGBoost<br/>Fallback: Transparent Rule-Based CI</i>"]
+        SHAP_ENGINE["Probability-Space SHAP<br/><i>Interventional TreeExplainer</i>"]
+        TWO_MODE --> CI["Criticality Index (CI ∈ [0, 100])"]
         SHAP_ENGINE --> REASONING["Controller Natural Language Reasoning"]
     end
 
@@ -50,8 +50,8 @@ flowchart TD
         SPATIAL & ELECTRICAL & SAFETY_MATRIX --> SHADOW_BLOCKS["Joint Shadow Blocks"]
     end
 
-    subgraph STAGE5 ["5. Google OR-Tools MILP Solver"]
-        OR_TOOLS["Google OR-Tools CP-SAT Solver"]
+    subgraph STAGE5 ["5. Google OR-Tools CP-SAT Solver"]
+        OR_TOOLS["Google OR-Tools CP-SAT Solver<br/><i>Constraint Programming</i>"]
         HARD_CONSTRAINTS["Tier-1 VIP Zero Detention Hard Rule<br/><i>Rajdhani & Vande Bharat Protection</i>"]
         SIMULATOR["What-If Sandbox Simulation<br/><i>HMAC Cryptographic Commit Tokens</i>"]
         OR_TOOLS --> HARD_CONSTRAINTS --> SIMULATOR
@@ -59,13 +59,14 @@ flowchart TD
 
     subgraph STAGE6 ["6. Fast Rescheduler & Telemetry"]
         GREEDY["Sub-second Greedy Rescheduler<br/><i>Live delays > 20 mins</i>"]
-        SLW["Emergency Single Line Working (SLW)<br/><i>G&SR Chapter 5/15 Protocol</i>"]
-        SSE["Server-Sent Events (SSE) Stream<br/><i>Live Disruption Alerts</i>"]
+        SLW["Temporary Single Line Working (TSLW)<br/><i>GR 3.68 & Form T/D 602</i>"]
+        SSE["WebSocket / SSE Telemetry Stream<br/><i>Live Disruption Alerts</i>"]
         GREEDY --> SLW --> SSE
     end
 
     subgraph STAGE7 ["7. Statutory Exports & Interfaces"]
         T351["Form T/351 Disconnection Portal<br/><i>Station Master Private Numbers (PN)</i>"]
+        TD602["Form T/D 602 Authority Sheet<br/><i>Line Clear Ticket & Caution Order</i>"]
         BDMS["CRIS BDMS Exporter<br/><i>Official Draft Possession Requests</i>"]
     end
 
@@ -81,13 +82,15 @@ flowchart TD
 
 ## ⚡ Stage-by-Stage Functional Breakdown
 
-* **Stage 1 — Multi-System Data Ingestion & Adapters:** Ingests maintenance defect requisitions from **TMS** (Civil Track), **SMMS** (Signal & Telecom), **TDMS** (Traction Distribution/Electrical), and train movements from **COA**. Edge adapters (`adapters.py`) normalize incoming requisitions into uniform `MaintenanceRequest` domain objects.
-* **Stage 2 — AI Risk & Criticality Scoring Engine:** Predicts a dynamic **Criticality Index ($CI \in [0, 100]$)** using gradient boosted trees (CatBoost/XGBoost) trained on domain-grounded Indian Railways degradation parameters. Evaluates feature contributions using **SHAP** to produce controller-facing explanations.
-* **Stage 3 — Corridor Gap & Headway Extractor:** Analyzes COA timetables to identify unoccupied track windows ($\ge 60\text{ min}$) with statutory **$\ge 15\text{ min}$ safety headways** before and after train movements, stitching gaps across midnight rolling boundaries.
+* **Stage 1 — Multi-System Data Ingestion & Adapters:** Ingests maintenance defect requisitions from **TMS** (Civil Track), **SMMS** (Signal & Telecom), **TDMS** (Traction Distribution/Electrical), and train movements & goods trains forecast from **COA**. Edge adapters (`adapters.py`) normalize incoming requisitions into uniform `MaintenanceRequest` domain objects supporting standard IRPWM USFD classifications (`GOOD`, `IMR`, `IMRW`, `OBS`, `OBSW`) and Track Geometry Curvature.
+* **Stage 2 — AI Risk & Criticality Scoring Engine:** Predicts a dynamic **Criticality Index ($CI \in [0, 100]$)** using a **Two-Mode Scoring Architecture**:
+  * **Primary Deployed Model (Mode 2):** Monotone-constrained Gradient Boosted Trees (`XGBoost` / `LightGBM`) trained on simulated 30-day failure hazard outcomes with domain randomization and feature interactions, post-hoc isotonic-calibrated, and served with probability-space **SHAP** attributions.
+  * **Deterministic Fallback & Baseline (Mode 1):** A transparent expert-weighted linear formula used when model artifacts are absent and as the comparative baseline in evaluation. Incorporates the statutory **Availability-Impact Dimension** ($\text{MPS} - v_{\text{TSR}}$).
+* **Stage 3 — Corridor Gap & Headway Extractor:** Analyzes COA timetables and goods trains forecast (`FORECAST_FREIGHT`) to identify unoccupied track windows ($\ge 60\text{ min}$) with statutory **$\ge 15\text{ min}$ safety headways** before and after train movements, stitching gaps across midnight rolling boundaries.
 * **Stage 4 — Joint Shadow Block Clustering:** Bundles compatible multi-department maintenance tasks occurring within $\le 10\text{ km}$ spatial bounds and Substation Feeding Post (FP) / Sectioning Post (SP) electrical power zones ($40\text{--}80\text{ km}$), strictly enforcing the **G&SR Statutory Safety Conflict Matrix**.
-* **Stage 5 — Google OR-Tools CP-SAT MILP Optimization Solver:** Formulates a Space-Time Mixed-Integer Linear Programming (MILP) model. Enforces **hard zero-detention constraints for Tier 1 VIP trains (Rajdhani, Vande Bharat, Shatabdi)** while optimizing block placement, shadow overlap hours, and equipment resource availability.
-* **Stage 6 — Real-Time Fast Rescheduler & Emergency Protocol:** Triggers sub-second greedy time-shifting when live train delays exceed $20\text{ minutes}$. Automatically generates **G&SR Chapter 5/15 Single Line Working (SLW)** emergency advisories if block overruns threaten traffic flow.
-* **Stage 7 — Statutory Form T/351 & CRIS BDMS Exporters:** Enforces digital Station Master **Private Number (PN)** exchanges for track disconnections/reconnections and exports draft possession requests directly in official **CRIS BDMS JSON format**.
+* **Stage 5 — Google OR-Tools CP-SAT Optimization Solver:** Formulates a Space-Time constraint programming model supporting multi-horizon planning (24h tactical, 7-day weekly, 30-day master via `horizon_days=7|30`). Enforces **hard zero-detention constraints for Tier 1 VIP trains (Rajdhani, Vande Bharat, Shatabdi)** while optimizing block placement and heavy machine fleet capacity limits.
+* **Stage 6 — Real-Time Fast Rescheduler & Emergency Protocol:** Triggers sub-millisecond greedy time-shifting when live train delays exceed $20\text{ minutes}$. Automatically generates **Temporary Single Line Working (TSLW)** advisories per **GR 3.68 & zonal SR Chapters 4/15** with **Form T/D 602** support sheets and Section Controller control-phone scripts.
+* **Stage 7 — Statutory Form T/351, Form T/D 602 & CRIS BDMS Exporters:** Enforces digital Station Master **Private Number (PN)** exchanges for track disconnections/reconnections, exports Form T/D 602 TSLW authority sheets, and exports draft possession requests directly in official **CRIS BDMS JSON format**.
 
 ---
 
@@ -97,43 +100,37 @@ flowchart TD
 
 | Feature Name | Type | Range | Department | Domain Description |
 | :--- | :---: | :---: | :---: | :--- |
-| **`tgi_deviation`** | `float` | `0.0` -- `100.0` | Track (TMS) | Deviation from standard Track Geometry Index ($100 - \text{TGI}$). |
-| **`speed_restriction_kmh`**| `float` | `0.0` -- `100.0` | All | Speed drop delta ($\text{MPS} - v_{\text{TSR}}$). |
+| **`tgi_deviation`** | `float` | `0.0` -- `100.0` | Track (TMS) | Deviation from standard Track Geometry Index ($100 - \text{TGI}$) across Gauge, Cross-Level, Twist, Longitudinal Level, Alignment, and Curvature. |
+| **`speed_restriction_kmh`**| `float` | `0.0` -- `120.0` | All | Speed drop delta ($\text{MPS} - v_{\text{TSR}}$), measuring impact on asset availability. |
 | **`days_overdue`** | `float` | `0.0` -- `60.0` | All | Days elapsed past statutory maintenance deadline. |
 | **`section_gmt_density`** | `float` | `5.0` -- `150.0` | All | Annual Gross Million Tonnes carried by section (traffic density). |
-| **`department_code`** | `int` | `0, 1, 2` | All | `0`: Track (TMS), `1`: Signal (SMMS), `2`: Traction (TDMS). |
-| **`usfd_flaw_severity`** | `int` | `0` -- `3` | Track (TMS) | `0`: None, `1`: OBS, `2`: REM, `3`: `IMR` (*Immediate Removal*). |
+| **`department_code`** | `str` / `int` | `TRACK`, `SIGNAL`, `TRACTION` | All | Department identifier. |
+| **`usfd_flaw_severity`** | `str` / `int` | `Good (0)`, `OBS (1)`, `OBSW (2)`, `IMR (3)`, `IMRW (4)` | Track (TMS) | Ultrasonic Flaw Detection category per IRPWM (T1 = IMR/IMRW, T2 = OBS/OBSW). |
 | **`point_failure_risk`** | `float` | `0.0` -- `100.0` | Signal (SMMS) | S&T Point machine locking latency failure risk ($>4.5\text{s}$). |
 | **`ohe_insulator_wear`** | `float` | `0.0` -- `100.0` | Traction (TDMS) | OHE contact wire wear percentage ($>20\text{--}30\%$ limit). |
 
 ---
 
-### 🔬 ML Models & Mathematical Theory
+### 🔬 ML Models & Evaluation Protocol
 
-#### 1. XGBoost (Extreme Gradient Boosting)
-* **Mathematical Theory:** Minimizes a regularized objective function using a 2nd-order Taylor expansion:
-$$\mathcal{L}^{(t)} = \sum_{i=1}^n l\left(y_i, \hat{y}_i^{(t-1)} + f_t(x_i)\right) + \gamma T + \frac{1}{2}\lambda \sum_{j=1}^T w_j^2$$
-Optimal leaf weight $w_j^*$ for leaf $j$ with gradients $g_i$ and Hessians $h_i$:
-$$w_j^* = -\frac{\sum_{i \in I_j} g_i}{\sum_{i \in I_j} h_i + \lambda}$$
-* **Implementation & Results:** Optimized via Optuna in `ml/train.py`. Achieved 5-fold CV RMSE of **`2.6322`**.
+#### 1. Binary Maintenance Prioritization & Label Design
+* **Synthetic Hazard Simulation:** Labels represent simulated 30-day failure outcomes: $y \sim \text{Bernoulli}\left(\sigma(\text{logit}_0 + \sum \beta_k f_k + \sum \gamma_{ij} \text{interaction}_{ij})\right)$ with domain randomization across 50 latent railway section regimes and configurable label noise (2–5%).
+* **Non-Linear Interactions:** Incorporates domain physics including `usfd_flaw_severity × section_gmt_density`, `ohe_insulator_wear × section_gmt_density`, and `point_failure_risk × days_overdue`.
 
-#### 2. LightGBM (Light Gradient Boosting Machine)
-* **Mathematical Theory:** Uses **Leaf-wise (best-first)** tree growth and **Gradient-based One-Side Sampling (GOSS)** to inspect instances with larger gradients.
-* **Implementation & Results:** Evaluated in Optuna study. Achieved 5-fold CV RMSE of **`2.7775`**.
+#### 2. Cross-Validation & Calibration Benchmark
+* **Stratified Group K-Fold:** Evaluated via 5-fold `StratifiedGroupKFold` grouped by `section_id`, reserving a dedicated group-disjoint split exclusively for post-hoc Isotonic Calibration (`CalibratedClassifierCV`).
+* **Evaluation Metrics:**
+  * **PR-AUC (Headline Ranking Metric):** `0.2270` (Mean) / `0.2041` (Worst Fold).
+  * **Precision@25:** `19.4%` (outperforming v1 rule baseline by `+0.9%` absolute).
+  * **NDCG@25:** `0.9243` ranking fidelity against true hazard probabilities.
+  * **Spearman $\rho$:** `0.8905` rank correlation.
+* **Robustness:** Evaluated under heavy-freight covariate shift (`PR-AUC 0.7242`) and label noise degradation (98.9% rank retention under 5% noise).
 
-#### 3. CatBoost (Categorical Boosting) — 🏆 Winning Model
-* **Mathematical Theory:** Employs **Ordered Boosting** to prevent target leakage and **Symmetric (Oblivious) Trees** where every node at a given level uses the exact same split condition. This guarantees fast hardware SIMD vectorization and prevents overfitting.
-* **Implementation & Results:** **Won the model benchmark** with 5-fold CV RMSE of **`2.3476`**.
-* **Final Test Evaluation Metrics:**
-  * **$R^2 \text{ Score} = 0.9881$** (Target: $\ge 0.95$) ✅
-  * **$\text{RMSE} = 2.2866$** (Target: $\le 3.5$) ✅
-  * **$\text{MAE} = 1.7358$** (Target: $\le 2.5$) ✅
-* Model Artifact: `backend/data/ml_models/criticality_xgboost_v2.joblib`
-
-#### 4. SHAP (SHapley Additive exPlanations)
-* **Mathematical Theory:** Game-theoretic feature attributions computing exact marginal contributions across feature subsets $S$:
-$$\phi_i(x) = \sum_{S \subseteq F \setminus \{i\}} \frac{|S|!(|F| - |S| - 1)!}{|F|!} \left[ f\left(S \cup \{i\}\right) - f(S) \right]$$
-* **Output:** Generates human-readable controller reasonings (e.g., *"Job rated 88.4/100 [CRITICAL] primarily driven by USFD Ultrasonic Rail Flaw (+36.5 pts)"*). Diagnostic plots saved in `ml/reports/`.
+#### 3. Probability-Space SHAP Explainability
+* **Interventional TreeExplainer:** Built once on startup using a 200-sample background distribution:
+  $$\text{base} + \sum_{i=1}^M \phi_i \approx P(\text{failure})$$
+* **Human-Readable Natural Language Reasoning:**
+  > *"Base failure rate 8%. USFD IMR flaw +21 pts, 80 km/h TSR +14, 14 days overdue +9, heavy-freight section +6, TGI deviation +3 → 61% simulated 30-day failure probability; CI 88 = riskier than 88% of the current backlog."*
 
 ---
 
@@ -145,30 +142,37 @@ SIH26-RailBlock/
 │   ├── alembic/                 # Database schema migration scripts (Alembic)
 │   ├── app/
 │   │   ├── api/                 # FastAPI REST Endpoint Routers (auth, blocks, optimizer, risk, events)
-│   │   ├── core/                # System configuration, Async SQLAlchemy session, JWT & RBAC security
+│   │   ├── core/                # System config, Async SQLAlchemy, JWT & 4+1-Tier RBAC
 │   │   ├── models/              # SQLAlchemy 2.0 async database ORM models (9 tables)
-│   │   ├── schemas/             # Pydantic v2 validation & response contracts
-│   │   ├── services/            # Pure computational engines (gap_extractor, clustering, optimizer, rescheduler)
-│   │   └── main.py              # Application factory & middleware setup
+│   │   ├── schemas/             # Pydantic v2 validation contracts with domain bounds
+│   │   ├── services/            # Pure computational engines (gap_extractor, clustering, optimizer, rescheduler, ml_risk_engine)
+│   │   └── main.py              # Application factory, rate limiting & logging middleware
 │   ├── data/
-│   │   ├── raw/                 # Real IR Open Data (8,990 Stations & 8,000+ Trains)
-│   │   ├── ml_models/           # Exported production models (criticality_xgboost_v2.joblib)
+│   │   ├── raw/                 # Synthetic Seed Sandbox calibrated to published IR statistics
+│   │   ├── ml_models/
+│   │   │   └── criticality_v1/  # Production ML artifact bundle (model.json, calibrator, schema, enums, ci_map, background, model_card)
 │   │   └── seed_all.py          # Database seeder script
-│   ├── tests/                   # Automated pytest suite (111 passing tests)
+│   ├── tests/                   # Automated pytest suite (118 passing tests)
 │   ├── Dockerfile               # Multi-stage production container configuration
 │   ├── entrypoint.sh            # Auto-migration + seed + server startup script
 │   └── requirements.txt         # Production backend dependencies
 │
 ├── ml/                          # Dedicated Offline AI/ML Development Workspace
+│   ├── config.py                # Global seed, feature definitions, domain bounds & v1 rule weights
 │   ├── data/
-│   │   ├── synthetic_generator.py # Domain-grounded IR dataset generator (6,000 samples)
+│   │   ├── synthetic_generator.py # Hazard-based IR dataset generator (6,000 samples)
 │   │   └── ir_defects_dataset.csv # Output synthetic dataset
-│   ├── reports/                 # Diagnostic plots (feature_importance.png, shap_beeswarm_summary.png)
-│   ├── train.py                 # Optuna hyperparameter tuning (XGBoost, LightGBM, CatBoost)
-│   ├── evaluate.py              # Benchmark evaluation (R², RMSE, MAE) & diagnostic report generator
-│   ├── explainer.py             # SHAP TreeExplainer & controller reasoning string builder
+│   ├── reports/
+│   │   ├── eval_report.md       # Comprehensive evaluation benchmark & calibration report
+│   │   ├── feature_importance.png # Feature importance diagnostic plot
+│   │   └── shap_beeswarm_summary.png # SHAP beeswarm diagnostic plot
+│   ├── train.py                 # Monotone XGBoost/LightGBM training with SGKF & Isotonic Calibration
+│   ├── evaluate.py              # Ranking evaluation (PR-AUC, P@K, NDCG@K, Spearman, Shift, Noise)
+│   ├── explainer.py             # Probability-space SHAP TreeExplainer & reasoning generator
+│   ├── tests/                   # ML test suite (9 passing tests: additivity, monotonicity, bounds, fallback, leakage)
 │   └── requirements-ml.txt      # Dedicated ML dependencies
 │
+├── frontend/                    # Control Office Application SPA (React + Vite + TailwindCSS)
 ├── docs/                        # Specifications & 6 Architectural Decision Records (ADRs)
 ├── CONTEXT.md                   # Canonical Railway Domain Glossary
 ├── docker-compose.yml           # Multi-container orchestration (PostgreSQL 15, pgAdmin, Backend)
@@ -179,10 +183,11 @@ SIH26-RailBlock/
 
 ## 🐳 Docker Deployment & Quickstart
 
-RailBlock is fully containerized with multi-container orchestration.
+RailBlock is containerized with multi-container orchestration.
 
 ### Prerequisites
-* **Docker & Docker Compose** installed on your system.
+* **Python 3.12+** and **`uv`**
+* **Docker & Docker Compose**
 
 ---
 
@@ -207,7 +212,7 @@ docker compose up -d
 This automatically:
 1. Provisions **PostgreSQL 15** on port `5433` and **pgAdmin 4** on `http://localhost:5050`.
 2. Runs database migrations (`alembic upgrade head`).
-3. Seeds real Indian Railways stations (8.9k), trains (8k+), and maintenance requisitions.
+3. Seeds the synthetic sandbox representing 8.9k stations, 8k+ trains, and maintenance requisitions.
 4. Starts the **FastAPI Backend Core** on `http://localhost:8000`.
 
 ---
@@ -228,26 +233,45 @@ This automatically:
 | `/api/v1/sections` | `GET` | Retrieve list of railway sections with station markers |
 | `/api/v1/train-movements` | `GET` | List timetabled train movements on a specific section |
 | `/api/v1/maintenance` | `GET` | List pending maintenance requests across Track, Signal, and Traction |
-| `/api/v1/optimizer/run` | `POST` | Execute Stage 3 $\to$ 4 $\to$ 5 solver and persist scheduled blocks |
+| `/api/v1/optimizer/run?horizon_days=7\|30` | `POST` | Execute Stage 3 $\to$ 4 $\to$ 5 solver across 24h, 7-day (weekly), or 30-day (monthly) horizons |
 | `/api/v1/optimizer/simulate` | `POST` | Pure in-memory What-If scenario simulation with HMAC commit token |
 | `/api/v1/optimizer/commit-simulation` | `POST` | Commit simulated schedule to DB using verified HMAC token |
 | `/api/v1/blocks/{id}/transition` | `POST` | Form T/351 Private Number exchange state machine transition |
 | `/api/v1/blocks/{id}/export-bdms` | `GET` | Export approved block in official CRIS BDMS draft JSON format |
 | `/api/v1/blocks/{id}/t351-notice` | `GET` | Export statutory Form T/351 Disconnection Notice payload |
-| `/api/v1/risk/score` | `POST` | Predict Criticality Index ($CI \in [0, 100]$) and SHAP factor attribution |
-| `/api/v1/events/telemetry` | `GET` | Server-Sent Events (SSE) live train delay broadcast stream |
+| `/api/v1/blocks/{id}/td602-sheet` | `GET` | Export statutory Form T/D 602 TSLW line clear authority and caution order support sheet |
+| `/api/v1/risk/predict` | `POST` | Predict failure probability, Criticality Index ($CI \in [0, 100]$), and probability-space SHAP attribution |
+| `/api/v1/risk/model-info` | `GET` | Retrieve active model card metadata, training parameters, bounds, and SHA-256 digest |
+| `/api/v1/events/ws/telemetry` | `WS` | WebSocket live train delay & SLW broadcast stream |
+
+---
+
+## 🧪 Verification & Test Suite
+
+All unit and integration tests are verified across the ML workspace and backend core:
+```bash
+# 1. Run ML tests (additivity, monotonicity, bounds, fallback, leakage)
+uv run pytest ml/tests/ -v
+
+# 2. Run Backend tests (auth, optimizer, clustering, rescheduler, ingestion, blocks)
+cd backend && uv run pytest -v
+```
+**Total:** **127 / 127 tests passing (100% success)** (118 Backend + 9 ML).
 
 ---
 
 ## 📜 Architectural Decision Records (ADRs)
 
-Key architectural decisions are documented under [`docs/adr/`](file:///Users/santhoshsl/RailBlock/docs/adr/):
-* **ADR 0001:** Two-Tier Optimization Architecture (Offline MILP + Real-Time Greedy Heuristic)
+Key architectural decisions are documented under [`docs/adr/`](docs/adr/):
+* **ADR 0001:** Two-Tier Optimization Architecture (Offline CP-SAT + Real-Time Fast Greedy Heuristics)
 * **ADR 0002:** Read-Only Edge Gateway & RailNet Air-Gap Security
 * **ADR 0003:** Tiered Train Detention & Zero-Tolerance VIP Timetable Protection
 * **ADR 0004:** Directional Track Possession & Flexible Internal Shadow Offsets
-* **ADR 0005:** Statutory Block Lifecycle & Station Master Private Number State Machine
+* **ADR 0005:** Statutory Block Lifecycle, Private Number State Machine & TSLW Protocol
 * **ADR 0006:** In-Memory What-If Simulation with HMAC Commit Tokens
+* **ADR 0007:** Two-Mode AI Risk Scoring Architecture with Probability-Space SHAP
+* **ADR 0008:** Multi-Horizon Constraint Optimization & Goods Trains Forecast Overlay
+* **ADR 0009:** 4+1-Tier Role-Based Access Control (RBAC) & Statutory Divisional Escalation
 
 ---
 

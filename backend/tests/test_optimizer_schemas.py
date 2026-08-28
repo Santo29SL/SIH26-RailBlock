@@ -81,9 +81,9 @@ def test_optimizer_run_request_valid():
 
 def test_optimizer_run_request_validation_failures():
     """Test validation constraints on OptimizerRunRequest."""
-    # Invalid horizon_days (>7)
+    # Invalid horizon_days (>30)
     with pytest.raises(ValidationError):
-        OptimizerRunRequest(target_date=date(2026, 8, 25), horizon_days=8)
+        OptimizerRunRequest(target_date=date(2026, 8, 25), horizon_days=31)
 
     # Invalid horizon_days (<1)
     with pytest.raises(ValidationError):

@@ -19,9 +19,11 @@ class IngestTMSPayload(BaseModel):
     """TMS Track Management System ingestion payload."""
 
     section_id: uuid.UUID
-    usfd_flaw_severity: int = Field(2, ge=0, le=3, description="USFD flaw level (0 to 3)")
+    usfd_classification: Optional[str] = Field("IMR", description="USFD flaw classification (GOOD, OBS, OBSW, IMR, IMRW)")
+    usfd_flaw_severity: Optional[int] = Field(None, ge=0, le=4, description="USFD flaw numeric level (0 to 4: Good=0, OBS=1, OBSW=2, IMR=3, IMRW=4)")
     tgi_deviation: float = Field(82.5, ge=0.0, le=100.0, description="TGI index deviation")
     chainage_km: float = Field(142.5, description="Track chainage kilometer marker")
+    curvature_deg: float = Field(0.0, ge=0.0, le=16.0, description="Track curvature in degrees")
     duration_minutes: int = Field(150, ge=15, le=480, description="Estimated work duration")
 
 
@@ -49,9 +51,11 @@ async def ingest_tms_defect(payload: IngestTMSPayload, db: AsyncSession = Depend
     req = await LegacySystemAdapter.ingest_tms_defect(
         db=db,
         section_id=payload.section_id,
+        usfd_classification=payload.usfd_classification or "IMR",
         usfd_flaw_severity=payload.usfd_flaw_severity,
         tgi_deviation=payload.tgi_deviation,
         chainage_km=payload.chainage_km,
+        curvature_deg=payload.curvature_deg,
         estimated_duration_min=payload.duration_minutes,
     )
     return {
