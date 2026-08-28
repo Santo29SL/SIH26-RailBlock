@@ -2,10 +2,10 @@
 
 Stage 6 Algorithmic Core for RailBlock (SIH PS 26027).
 
-Performs event-driven greedy heuristic time-shifting (<1s) for live train delays >20 mins
-without re-solving the global Google OR-Tools MILP, and automatically generates statutory
-Single Line Working (SLW) emergency advisory notices under Indian Railways General and
-Subsidiary Rules (G&SR) Chapter 5/15 when an active maintenance block overruns with queued
+Performs event-driven greedy heuristic time-shifting (<1 ms) for live train delays >20 mins
+without re-solving the global Google OR-Tools CP-SAT model, and automatically generates statutory
+Temporary Single Line Working (TSLW) emergency advisory notices and Form T/D 602 support sheets under Indian Railways General and
+Subsidiary Rules (GR 3.68 & Zonal SR Chapter 4/15) when an active maintenance block overruns with queued
 passenger trains.
 
 Canonical domain terminology strictly follows CONTEXT.md:
@@ -559,7 +559,7 @@ def apply_greedy_time_shift(
 ) -> ScheduledBlock:
     """Apply greedy time-shifting to a ScheduledBlock and all internal shadow activities.
 
-    Runs in microseconds (<1ms) without re-solving the global MILP solver.
+    Runs in microseconds (<1ms) without re-solving the global CP-SAT model.
     Preserves all activity relative start/end offsets and durations.
     """
     new_start_dt = block.start_datetime + timedelta(minutes=shift_minutes)
@@ -763,7 +763,7 @@ def reschedule_on_disruption(
     """Evaluate a live disruption and execute real-time rescheduling or SLW fallback.
 
     Acceptance Criteria:
-    - Shifts block start/end times in <1s for live train delays >20 mins without global MILP re-solve.
+    - Shifts block start/end times in <1s for live train delays >20 mins without global CP-SAT re-solve.
     - Absorbs delays <= 20 mins into statutory safety buffers without disrupting the block schedule.
     - Triggers Indian Railways GR 3.68, SR 4.42, SR 4.09 & SR Chapter 15 Single Line Working (SLW) fallback advisory
       for maintenance block overruns (+15 mins past granted window) with queued trains.
@@ -904,7 +904,7 @@ def reschedule_on_disruption(
 
         notes = [
             f"Train {trn_display} delayed by {delay_minutes} mins (> {TRAIN_DELAY_THRESHOLD_MINUTES} min threshold).",
-            "Greedy time-shift applied without global MILP re-solve.",
+            "Greedy time-shift applied without global CP-SAT re-solve.",
             f"Block schedule shifted from {block.start_time.strftime('%H:%M')}–{block.end_time.strftime('%H:%M')} "
             f"to {shifted.start_time.strftime('%H:%M')}–{shifted.end_time.strftime('%H:%M')}.",
             f"All {len(shifted.activities)} internal shadow activities preserved with original durations and relative offsets.",

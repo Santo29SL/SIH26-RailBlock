@@ -1,7 +1,7 @@
 """Integration tests for Optimizer APIs, What-If Simulation, and Statutory Exports.
 
 Ticket 06 Test Suite covering:
-- POST /api/v1/optimizer/run (MILP solver execution and DB persistence)
+- POST /api/v1/optimizer/run (CP-SAT solver execution and DB persistence)
 - POST /api/v1/optimizer/simulate (In-memory simulation with HMAC commit token)
 - POST /api/v1/optimizer/commit-simulation (Verified commit with valid, expired, and tampered tokens)
 - POST /api/v1/optimizer/reschedule (Real-time fast rescheduling & SLW fallback)

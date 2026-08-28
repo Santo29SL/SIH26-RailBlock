@@ -204,7 +204,7 @@ async def run_optimizer(
 
     Fetches track sections, active train movements, pending maintenance requests,
     resources, and compatibility rules from the database, runs Google OR-Tools
-    MILP solver, and optionally persists scheduled Block and BlockJob records.
+    CP-SAT constraint programming solver, and optionally persists scheduled Block and BlockJob records.
     """
     effective_horizon = horizon_days if horizon_days is not None else request.horizon_days
 
@@ -707,7 +707,7 @@ async def reschedule_live_disruption(
 ) -> RescheduleResponse:
     """Evaluate live train delay or maintenance overrun and apply greedy shift or SLW advisory.
 
-    - Shifts block times in <1s for delays >20 mins without re-solving global MILP.
+    - Shifts block times in <1s for delays >20 mins without re-solving global CP-SAT model.
     - Absorbs delays <= 20 mins into statutory safety buffers.
     - Generates statutory Indian Railways G&SR Chapter 5/15 Single Line Working (SLW)
       emergency advisory for overruns (+15 mins) with queued passenger trains.

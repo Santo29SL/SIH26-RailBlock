@@ -263,12 +263,15 @@ cd backend && uv run pytest -v
 ## 📜 Architectural Decision Records (ADRs)
 
 Key architectural decisions are documented under [`docs/adr/`](docs/adr/):
-* **ADR 0001:** Two-Tier Optimization Architecture (Offline CP-SAT + Real-Time Greedy Heuristic)
+* **ADR 0001:** Two-Tier Optimization Architecture (Offline CP-SAT + Real-Time Fast Greedy Heuristics)
 * **ADR 0002:** Read-Only Edge Gateway & RailNet Air-Gap Security
 * **ADR 0003:** Tiered Train Detention & Zero-Tolerance VIP Timetable Protection
 * **ADR 0004:** Directional Track Possession & Flexible Internal Shadow Offsets
-* **ADR 0005:** Statutory Block Lifecycle & Station Master Private Number State Machine
+* **ADR 0005:** Statutory Block Lifecycle, Private Number State Machine & TSLW Protocol
 * **ADR 0006:** In-Memory What-If Simulation with HMAC Commit Tokens
+* **ADR 0007:** Two-Mode AI Risk Scoring Architecture with Probability-Space SHAP
+* **ADR 0008:** Multi-Horizon Constraint Optimization & Goods Trains Forecast Overlay
+* **ADR 0009:** 4+1-Tier Role-Based Access Control (RBAC) & Statutory Divisional Escalation
 
 ---
 

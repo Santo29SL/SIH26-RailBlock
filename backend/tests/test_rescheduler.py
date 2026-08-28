@@ -180,7 +180,7 @@ def test_type_alias_compatibility():
 
 
 def test_reschedule_delay_over_20_minutes(sample_scheduled_block: ScheduledBlock):
-    """AC: For train delays > 20 minutes, shift block start/end times in <1 second without global MILP re-solve."""
+    """AC: For train delays > 20 minutes, shift block start/end times in <1 second without global CP-SAT re-solve."""
     t0 = _time.perf_counter()
     outcome = reschedule_on_disruption(
         active_block=sample_scheduled_block,
