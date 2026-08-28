@@ -46,14 +46,68 @@ DEFAULT_SAFETY_BUFFER_MINUTES: int = 15
 TRAIN_DELAY_THRESHOLD_MINUTES: int = 20
 BLOCK_OVERRUN_THRESHOLD_MINUTES: int = 15
 
-# Statutory Speed Limits under G&SR Chapter 5 (Rule 5.15) & Chapter 15
+# Statutory Speed Limits under GR 3.68, SR 4.42, SR 4.09 & SR Chapter 15
 SLW_FIRST_PILOT_MAX_SPEED_KMPH: int = 25
 SLW_FACING_POINTS_MAX_SPEED_KMPH: int = 15
-SLW_SUBSEQUENT_MAX_SPEED_KMPH: int = 45
+SLW_SUBSEQUENT_MAX_SPEED_KMPH: int = 45  # Booked speed with caution; 40 km/h on automatic wrong-line
 
 GSR_SLW_RULE_REFERENCE: str = (
-    "G&SR Chapter 5 (Rule 5.15) & Chapter 15 - Introduction of Single Line Working on Double Line"
+    "GR 3.68, SR 4.42, SR 4.09 & SR Chapter 15 — Temporary Single Line Working (TSLW) on Double Line"
 )
+
+
+def generate_td602_authority_sheet(
+    section_code: str,
+    section_name: Optional[str],
+    obstructed_line: str,
+    single_line_in_use: str,
+    pilot_train_number: str,
+    private_number: str,
+    timestamp: datetime,
+    division: Optional[str] = "Chennai",
+    zone: Optional[str] = "Southern Railway",
+) -> Dict[str, Any]:
+    """Generate structured Form T/D 602 Authority to Proceed without Line Clear & Caution Order sheet."""
+    station_code = section_code.split("-")[0] if "-" in section_code else section_code
+    return {
+        "form_name": "Form T/D 602",
+        "form_title": "AUTHORITY FOR TEMPORARY SINGLE LINE WORKING ON DOUBLE LINE SECTION",
+        "statutory_rule": "GR 3.68, SR 4.42, SR 4.09 & SR Chapter 15",
+        "division": division or "Chennai",
+        "zone": zone or "Southern Railway",
+        "section_code": section_code,
+        "section_name": section_name or "Block Section",
+        "date_time": timestamp.strftime("%Y-%m-%d %H:%M:%S IST"),
+        "line_obstructed": obstructed_line,
+        "line_in_use": single_line_in_use,
+        "pilot_train_number": pilot_train_number,
+        "station_master_private_number": private_number,
+        "part_1_line_clear_ticket": f"Line Clear confirmed on {single_line_in_use} with Station Master PN {private_number}.",
+        "part_2_authority_to_pass_signals_at_on": f"Driver authorized to pass Starter and Advanced Starter Signals at 'ON' into {single_line_in_use}.",
+        "part_3_caution_order": {
+            "pilot_train_speed": "25 km/h (Day/Night pilot speed ceiling)",
+            "facing_points_speed": "15 km/h over all facing points and crossovers",
+            "subsequent_train_speed": "Booked Speed (40 km/h cap if wrong direction on Automatic Block)",
+            "clamping_padlocking_mandate": "All points leading to single line must be correctly set, clamped, and padlocked (SR 4.09).",
+        },
+    }
+
+
+def generate_controller_phone_script(
+    section_code: str,
+    obstructed_line: str,
+    single_line_in_use: str,
+    pilot_train_number: str,
+    private_number: str,
+) -> str:
+    """Generate verbatim Section Controller control-phone dispatch script for SLW."""
+    return (
+        f"[CONTROL PHONE SCRIPT - SECTION CONTROLLER TO ALL STATIONS {section_code}]\n"
+        f"'ALL CONCERNED STATIONS TAKE NOTE: Maintenance block on {obstructed_line} has overran.\n"
+        f"Temporary Single Line Working (TSLW) introduced on {single_line_in_use} under GR 3.68 and SR Chapter 15.\n"
+        f"First Pilot Train is {pilot_train_number}, authorised under Form T/D 602 with Station Master PN {private_number}.\n"
+        f"Speed: 25 km/h for first pilot train, 15 km/h over facing points. Regulate all freight in station sidings.'"
+    )
 
 
 # ── Action Classification Enum ───────────────────────────────
@@ -75,7 +129,7 @@ class RescheduleAction(str, enum.Enum):
 
 @dataclass(frozen=True)
 class SLWAdvisory:
-    """Statutory Single Line Working (SLW) emergency advisory under G&SR Chapter 5/15.
+    """Statutory Single Line Working (SLW) emergency advisory under GR 3.68, SR 4.42, SR 4.09 & SR Chapter 15.
 
     Issued when an active maintenance possession overruns and delays queued trains,
     authorizing pilot-protected bidirectional train movement on the parallel line.
@@ -97,6 +151,8 @@ class SLWAdvisory:
     queued_train_priorities: List[str] = field(default_factory=list)
     private_number: Optional[str] = None
     advisory_text: str = ""
+    td602_authority_sheet: Optional[Dict[str, Any]] = None
+    controller_phone_script: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert SLWAdvisory to standard dictionary representation."""
@@ -117,6 +173,8 @@ class SLWAdvisory:
             "queued_train_priorities": list(self.queued_train_priorities),
             "private_number": self.private_number,
             "advisory_text": self.advisory_text,
+            "td602_authority_sheet": self.td602_authority_sheet,
+            "controller_phone_script": self.controller_phone_script,
         }
 
 
@@ -636,6 +694,26 @@ def generate_slw_advisory(
         zone=zone,
     )
 
+    td602 = generate_td602_authority_sheet(
+        section_code=section_code,
+        section_name=section_name,
+        obstructed_line=obstructed,
+        single_line_in_use=single_in_use,
+        pilot_train_number=pilot_train_number or "12621",
+        private_number=pn_str,
+        timestamp=timestamp,
+        division=division or "Chennai",
+        zone=zone or "Southern Railway",
+    )
+
+    script = generate_controller_phone_script(
+        section_code=section_code,
+        obstructed_line=obstructed,
+        single_line_in_use=single_in_use,
+        pilot_train_number=pilot_train_number or "12621",
+        private_number=pn_str,
+    )
+
     return SLWAdvisory(
         advisory_id=uuid4(),
         timestamp=timestamp,
@@ -653,6 +731,8 @@ def generate_slw_advisory(
         queued_train_priorities=queued_list,
         private_number=pn_str,
         advisory_text=advisory_txt,
+        td602_authority_sheet=td602,
+        controller_phone_script=script,
     )
 
 

@@ -6,25 +6,25 @@
 ## 1. Scope & Ownership
 
 Aadith and Santhosh are responsible for the **algorithmic backbone, computational services, security layer, and API infrastructure** of RailBlock:
-1. **Data Architecture & Schema Persistence:** PostgreSQL database (9 tables), async SQLAlchemy 2.0 ORM, Alembic migrations, and real Indian Railways data seed pipelines.
-2. **Authentication, Security & Middleware:** OAuth2 Password Bearer JWT tokens, bcrypt password hashing, 4-tier Role-Based Access Control (`ADMIN`, `SECTION_CONTROLLER`, `STATION_MASTER`, `DEPARTMENT_ENGINEER`), `slowapi` rate limiting (120 req/min), `structlog` JSON structured logging, and OWASP security headers.
-3. **Legacy Ingestion Adapters (Stage 1):** Read-Only Edge Gateway adapters for TMS (Track flaws/TGI), SMMS (Point machines), and TDMS (OHE wire wear).
+1. **Data Architecture & Schema Persistence:** PostgreSQL database (9 tables), async SQLAlchemy 2.0 ORM, Alembic migrations, and Synthetic Seed Sandbox calibrated to published Indian Railways statistics.
+2. **Authentication, Security & Middleware:** OAuth2 Password Bearer JWT tokens, bcrypt password hashing, 4+1-tier Role-Based Access Control (`ADMIN`, `SECTION_CONTROLLER`, `STATION_MASTER`, `DEPARTMENT_ENGINEER`, `DIVISIONAL_AUTHORITY`), `slowapi` rate limiting (120 req/min), `structlog` JSON structured logging, and OWASP security headers.
+3. **Legacy Ingestion Adapters (Stage 1):** Read-Only Edge Gateway adapters for TMS (Track flaws/TGI with Good/IMR/IMRW/OBS/OBSW classification and Curvature), SMMS (Point machines), and TDMS (OHE wire wear).
 4. **Corridor Gap & Headway Extractor (Stage 3):** Train occupancy interval computation, multi-day rolling midnight stitching, and downtime slot extraction ($\ge 60\text{ min}$) with statutory $\ge 15\text{ min}$ safety headways.
 5. **Multi-Department Shadow Block Clustering (Stage 4):** Spatial clustering ($\le 10\text{ km}$), Traction FP/SP power boundary isolation matching, G&SR safety conflict validation, and primary anchor selection with internal flexible shadow offsets.
-6. **Constraint Optimization Engine (Stage 5):** Google OR-Tools Mixed-Integer Linear Programming (MILP / CP-SAT) solver enforcing Tier-1 VIP zero-detention hard constraints and regional heavy machine fleet capacity limits.
-7. **Real-Time Fast Rescheduling & SLW Fallback (Stage 6):** Sub-millisecond greedy heuristic solver for train delays $> 20\text{ min}$, and Single Line Working (SLW) fallback under G&SR Chapters 5 and 15 for block overruns.
+6. **Constraint Optimization Engine (Stage 5):** Google OR-Tools Constraint Programming (CP-SAT) solver enforcing Tier-1 VIP zero-detention hard constraints, regional heavy machine fleet capacity limits, and multi-horizon weekly/monthly batch triggers.
+7. **Real-Time Fast Rescheduling & SLW Fallback (Stage 6):** Sub-millisecond greedy heuristic solver for train delays $> 20\text{ min}$, and Temporary Single Line Working (TSLW) fallback under GR 3.68, zonal SR Chapter 4 (SR 4.42, SR 4.09), and zonal SR Chapter 15 with Form T/D 602 support sheets.
 8. **Statutory Exporters, What-If Sandbox & APIs (Stage 7):** In-memory What-If scenario calculations with signed HMAC-SHA256 commit tokens, Form T/351 Private Number exchange state machine, and CRIS BDMS JSON draft block exporter.
 
 ```mermaid
 flowchart TD
     subgraph AADITH & SANTHOSH BACKEND CORE
-        AUTH[Auth & RBAC: JWT / bcrypt] --> SEC[Security Middleware & Rate Limiting]
+        AUTH[Auth & RBAC: JWT / bcrypt / 5 Roles] --> SEC[Security Middleware & Rate Limiting]
         ING[Stage 1: Legacy Ingestion Adapters] --> DB[(PostgreSQL 9 Tables)]
         DB --> GAP[Stage 3: Corridor Gap Extractor]
         DB --> CLUST[Stage 4: Shadow Block Clustering & G&SR Rules]
-        GAP & CLUST --> OR[Stage 5: Google OR-Tools CP-SAT MILP Solver]
+        GAP & CLUST --> OR[Stage 5: Google OR-Tools CP-SAT Solver]
         OR --> SCHED[Optimized Blocks & Block Jobs]
-        RT[Stage 6: Fast Rescheduler & G&SR SLW Fallback] --> OR
+        RT[Stage 6: Fast Rescheduler & GR 3.68 SLW Fallback] --> OR
         SCHED --> API[Optimizer APIs, What-If HMAC Tokens, Form T/351 PN State Machine & BDMS Exporter]
     end
 ```
@@ -38,8 +38,8 @@ flowchart TD
 * **Implementation Details:**
   1. **Password Hashing:** Uses `passlib[bcrypt]` with automatic salting and 72-byte truncation protection.
   2. **JWT Token Engine:** Issues signed `HS256` Bearer tokens with 480-minute TTL containing `sub`, `role`, `user_id`, and `email`.
-  3. **Role-Based Access Control (RBAC):**
-     * `RoleEnum`: `ADMIN`, `SECTION_CONTROLLER`, `STATION_MASTER`, `DEPARTMENT_ENGINEER`.
+  3. **Role-Based Access Control (4+1-Tier RBAC):**
+     * `RoleEnum`: `ADMIN`, `SECTION_CONTROLLER`, `STATION_MASTER`, `DEPARTMENT_ENGINEER`, `DIVISIONAL_AUTHORITY` (for traffic blocks > 4 hrs and non-interlocking works > 3 days per Railway Board letter dated 16.06.2022).
      * `RequireRole(allowed_roles)` dependency enforcing role authorization with `ADMIN` superuser bypass.
   4. **Production Middleware:**
      * `slowapi.Limiter`: Enforces `120 requests/minute` per remote IP.
@@ -51,7 +51,7 @@ flowchart TD
 ### Module 1: Legacy Data System Ingestion Adapters (Stage 1)
 * **Files:** `backend/app/services/adapters.py`, `backend/app/api/ingestion.py`
 * **Adapters & Endpoints:**
-  1. **`TMSAdapter` (`POST /api/v1/ingest/tms`):** Ingests USFD rail flaw severity (0 to 3), Track Geometry Index (TGI deviation), and chainage km markers.
+  1. **`TMSAdapter` (`POST /api/v1/ingest/tms`):** Ingests USFD rail flaw classifications per IRPWM standard (**Good / IMR / IMRW / OBS / OBSW**, tabulated as T1 = IMR/IMRW, T2 = OBS/OBSW), Track Geometry Index (TGI - combining Gauge, Cross-Level, Twist, Longitudinal Level, Alignment, and Curvature), and chainage km markers.
   2. **`SMMSAdapter` (`POST /api/v1/ingest/smms`):** Ingests S&T point machine failure risk score, station code, and asset ID.
   3. **`TDMSAdapter` (`POST /api/v1/ingest/tdms`):** Ingests OHE contact wire wear percentage, Substation Feeding Post (FP) identifier, and power isolation flags.
 
@@ -94,6 +94,7 @@ flowchart TD
     4. **Tier 1 VIP Passenger Protection:** Hard zero-detention constraint ($\text{Detention}(m, g) = 0$ for all gaps adjacent to Rajdhani, Vande Bharat, Shatabdi, Tejas, Duronto, Gatimaan).
     5. **Machine Resource Capacity Limits:** Total heavy machines (Tamping Machines, Tower Wagons, BCMs) allocated across all concurrent section blocks cannot exceed active regional fleet capacity:
        $$\sum_{m \in \mathcal{M}_{\text{res}}} \sum_{g \in \mathcal{G}_t} y_{m, g} \le \text{Capacity}(\text{res}), \quad \forall \text{res} \in \mathcal{R}, \forall t$$
+  * **Multi-Horizon Support:** Re-optimizes rolling 7-day weekly base schedules and 30-day monthly corridor maintenance plans using the same CP-SAT solver formulation.
 
 ---
 
@@ -101,14 +102,14 @@ flowchart TD
 * **File:** `backend/app/services/rescheduler.py`
 * **Logic:**
   1. **Minor Delays ($\le 20\text{ min}$):** Absorbed directly into the $\ge 15\text{ min}$ statutory safety buffers.
-  2. **Major Delays ($> 20\text{ min}$):** Fast greedy heuristic re-solver shifts block start/end times in $< 1\text{ ms}$ without global MILP re-solving.
+  2. **Major Delays ($> 20\text{ min}$):** Fast greedy heuristic re-solver shifts block start/end times in $< 1\text{ ms}$ without global CP-SAT re-solving.
   3. **Block Overrun Disruption ($+15\text{ min}$ overrun with queued trains):**
-     * Triggers Indian Railways **G&SR Chapter 5 (Rule 5.15) & Chapter 15 Single Line Working (SLW)** emergency advisory protocol.
-     * Enforces statutory speed limits:
-       * **First Pilot Train MPS:** $25\text{ km/h}$
-       * **Facing Points / Crossovers:** $15\text{ km/h}$
-       * **Subsequent Running Trains:** $45\text{ km/h}$
-     * Generates standardized telegraphic SLW advisory notice with pilot train dispatch orders and siding holding orders for freight rakes.
+     * Triggers a **Temporary Single Line Working (TSLW) advisory** for the adjacent double line, per **GR 3.68** (Regulations for Single Line Working on Double Line during total interruption of communication), zonal **Subsidiary Rules Chapter 4** (SR 4.42 — SLW speed restrictions; SR 4.09 — clamping/padlocking of points), and zonal **SR Chapter 15** procedures. Written authority is issued via **Form T/D 602** (Line Clear Ticket + Authority to Pass Signals at 'ON' + Caution Order).
+     * Enforces statutory caution-order speed restrictions:
+       * **First / Pilot Train:** 25 km/h (caution order speed restriction)
+       * **Facing Points / Crossovers:** 15 km/h
+       * **Subsequent Running Trains:** Booked speed (a 40 km/h cap applies only to wrong-direction working on automatic block sections per TSL procedure)
+     * Generates a draft Caution Order + Form T/D 602 support sheet and Section Controller control-phone script; freight regulation (holding trains in sidings) is presented as controller decision support.
 
 ---
 
@@ -186,11 +187,11 @@ All endpoints are hosted under prefix `/api/v1`:
 | Module | Weight | Status | % Done |
 | :--- | :---: | :---: | :---: |
 | **1. Data Architecture, ORM Models (9 Tables) & Seeds** | 15% | ✅ Complete | **100%** |
-| **2. Authentication, RBAC & Security Middleware** | 10% | ✅ Complete | **100%** |
+| **2. Authentication, RBAC (4+1 Tier) & Security Middleware** | 10% | ✅ Complete | **100%** |
 | **3. Legacy Ingestion Adapters & APIs** | 10% | ✅ Complete | **100%** |
 | **4. Corridor Gap & Headway Extractor (Stage 3)** | 15% | ✅ Complete | **100%** |
 | **5. Shadow Block Clustering & G&SR Conflict Engine (Stage 4)** | 15% | ✅ Complete | **100%** |
-| **6. Google OR-Tools MILP Solver (Stage 5)** | 15% | ✅ Complete | **100%** |
-| **7. Real-Time Fast Rescheduler & G&SR SLW Fallback (Stage 6)** | 10% | ✅ Complete | **100%** |
+| **6. Google OR-Tools CP-SAT Solver (Stage 5)** | 15% | ✅ Complete | **100%** |
+| **7. Real-Time Fast Rescheduler & GR 3.68 SLW Fallback (Stage 6)** | 10% | ✅ Complete | **100%** |
 | **8. Optimizer, What-If HMAC & Statutory Export APIs (Stage 7)** | 10% | ✅ Complete | **100%** |
 | **TOTAL BACKEND CORE COMPLETION** | **100%** | ✅ **COMPLETE** | **100%** |

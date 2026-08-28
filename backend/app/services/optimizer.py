@@ -664,18 +664,20 @@ def run_optimization_pipeline(
             if s_id is not None:
                 target_sections.add(s_id)
 
-    # 2. Extract Corridor Gaps across all sections (Stage 3)
+    # 2. Extract Corridor Gaps across all sections and all horizon days (Stage 3)
     all_gaps: List[CorridorGap] = []
-    for s_id in target_sections:
-        sec_gaps = extract_corridor_gaps(
-            movements=movements,
-            target_date=effective_date,
-            section_id=s_id,
-            min_gap_minutes=gap_min,
-            safety_buffer_minutes=sec_buffer,
-            horizon_days=horizon_days,
-        )
-        all_gaps.extend(sec_gaps)
+    for day_offset in range(horizon_days):
+        current_date = effective_date + timedelta(days=day_offset)
+        for s_id in target_sections:
+            sec_gaps = extract_corridor_gaps(
+                movements=movements,
+                target_date=current_date,
+                section_id=s_id,
+                min_gap_minutes=gap_min,
+                safety_buffer_minutes=sec_buffer,
+                horizon_days=1,
+            )
+            all_gaps.extend(sec_gaps)
 
     # 3. Cluster Maintenance Requests into Candidate Shadow Blocks (Stage 4)
     candidate_blocks = cluster_shadow_blocks(

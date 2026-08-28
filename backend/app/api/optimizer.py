@@ -752,6 +752,8 @@ async def reschedule_live_disruption(
             queued_train_priorities=outcome.slw_advisory.queued_train_priorities,
             private_number=outcome.slw_advisory.private_number,
             advisory_text=outcome.slw_advisory.advisory_text,
+            td602_authority_sheet=outcome.slw_advisory.td602_authority_sheet,
+            controller_phone_script=outcome.slw_advisory.controller_phone_script,
         )
 
     return RescheduleResponse(

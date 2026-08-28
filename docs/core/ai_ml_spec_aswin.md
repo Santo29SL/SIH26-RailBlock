@@ -5,7 +5,11 @@
 
 ## 1. System Overview & Objective
 
-The goal of this module is to replace manual, subjective railway maintenance prioritization with an objective, data-driven **Criticality Index ($CI \in [0, 100]$)** using Gradient Boosted Decision Trees (`XGBoost` / `LightGBM`) paired with **SHAP (SHapley Additive exPlanations)**.
+The goal of this module is to replace manual, subjective railway maintenance prioritization with an objective, data-driven **Criticality Index ($CI \in [0, 100]$)** using a **Two-Mode Scoring Architecture**:
+1. **Mode 1 (Operational Baseline — Deployed):** A transparent, expert-weighted linear scoring formula with deterministic coefficients calibrated to Indian Railways domain guidelines.
+2. **Mode 2 (Planning & Research — ML Upgrade Path):** Gradient Boosted Decision Trees (`XGBoost` / `LightGBM` / `CatBoost`) paired with **SHAP (SHapley Additive exPlanations)**, activated as historical defect-to-failure records accumulate post-pilot.
+
+Both modes share identical semantic outputs ($CI \in [0, 100]$), enabling seamless downstream execution in Stage 4 (Clustering) and Stage 5 (OR-Tools CP-SAT).
 
 ### Architecture & Workflow
 
@@ -31,19 +35,21 @@ flowchart TD
 
 ## 2. Mathematical Formulation & Feature Specifications
 
-### 2.1 Criticality Index Formula
+### 2.1 Criticality Index Formula (Mode 1 & Ground Truth)
 $$CI = w_1 \cdot \text{TGI\_Deviation} + w_2 \cdot \Delta v_{\text{SpeedRestriction}} + w_3 \cdot \text{DaysOverdue} + w_4 \cdot \text{SectionGMTDensity} + \text{DefectSeverityPenalty}$$
+
+* **Severity Mapping:** The `DefectSeverityPenalty` term is strictly driven by the statutory Indian Railways USFD classification (`IMRW` and `OBSW` receive the highest penalties; `IMR` / `OBS` moderate; `Good` = 0).
 
 ### 2.2 Feature Specifications
 
 | Feature Name | Type | Range / Values | Department | Description |
 | :--- | :---: | :---: | :---: | :--- |
-| **`tgi_deviation`** | `float` | `0.0` to `100.0` | Track (TMS) | Deviation from standard Track Geometry Index ($100 - \text{TGI}$). |
+| **`tgi_deviation`** | `float` | `0.0` to `100.0` | Track (TMS) | Deviation from standard Track Geometry Index ($100 - \text{TGI}$) computed across Gauge, Cross-Level, Twist, Longitudinal Level, Alignment, and Curvature. |
 | **`speed_restriction_kmh`**| `float` | `0.0` to `120.0` | All | Speed drop delta: $\text{MPS} - v_{\text{TSR}}$ (e.g. $110 - 30 = 80\text{ km/h}$). |
 | **`days_overdue`** | `float` | `0.0` to `60.0` | All | Days elapsed past statutory maintenance deadline. |
 | **`section_gmt_density`** | `float` | `5.0` to `150.0` | All | Annual Gross Million Tonnes carried by section (traffic density). |
 | **`department_code`** | `int` | `0` (Track), `1` (Signal), `2` (Traction) | All | Department identifier code. |
-| **`usfd_flaw_severity`** | `int` | `0` (None), `1` (OBS), `2` (REM), `3` (IMR) | Track (TMS) | Ultrasonic Flaw Detection severity class (IMR = Immediate Removal). |
+| **`usfd_classification`** | `str` / `int` | `Good` (0), `OBS` (1), `OBSW` (2), `IMR` (3), `IMRW` (4) | Track (TMS) | Ultrasonic Flaw Detection category per IRPWM (T1 = IMR/IMRW, T2 = OBS/OBSW). |
 | **`point_failure_risk`** | `float` | `0.0` to `100.0` | Signal (SMMS) | S&T Point machine electromechanical locking delay/failure probability. |
 | **`ohe_insulator_wear`** | `float` | `0.0` to `100.0` | Traction (TDMS) | OHE contact wire stagger wear & insulator degradation percentage. |
 
@@ -51,7 +57,7 @@ $$CI = w_1 \cdot \text{TGI\_Deviation} + w_2 \cdot \Delta v_{\text{SpeedRestrict
 
 ## 3. Dedicated Workspace Structure (`ml/`)
 
-All AI/ML development must take place inside the root **`ml/`** directory:
+All AI/ML development takes place inside the root **`ml/`** directory:
 
 ```
 ml/
@@ -71,7 +77,7 @@ ml/
 
 ### Deliverable 1: Domain-Realistic Dataset Generator (`ml/data/synthetic_generator.py`)
 * Model realistic non-linear Indian Railways asset degradation curves:
-  * **Track (TMS):** TGI decay rate, USFD flaw categorical spikes (`IMR` $\to$ critical priority boost).
+  * **Track (TMS):** TGI decay rate (incorporating Curvature and Alignment), USFD flaw categorical spikes (`IMRW` / `IMR` $\to$ critical priority boost).
   * **Signal (SMMS):** Point locking latency ($>4.5\text{s}$ indicates imminent failure).
   * **Traction (TDMS):** OHE contact wire wear ($>65\%$ increases parting risk).
   * **Traffic Factor:** Higher GMT tracks amplify risk exponentially.
@@ -93,7 +99,7 @@ ml/
 * Initialize `shap.TreeExplainer` on the trained model.
 * Extract exact positive and negative SHAP impact points for each feature.
 * Generate human-readable explanation strings tailored for Section Controllers:
-  * *Example (Critical):* `"Job rated 88.4/100 [CRITICAL]: Severe USFD rail flaw (IMR) (+36.8 pts), 80 km/h speed restriction (+28.2 pts), and 14 days overdue on a 45.2 GMT track."`
+  * *Example (Critical):* `"Job rated 88.4/100 [CRITICAL]: Severe USFD rail flaw (IMRW) (+36.8 pts), 80 km/h speed restriction (+28.2 pts), and 14 days overdue on a 45.2 GMT track."`
   * *Example (Moderate):* `"Job rated 52.1/100 [MODERATE]: S&T point machine locking latency increased (+22.4 pts); recommended for bundling into joint shadow block."`
 
 ### Deliverable 4: Production Serving Clean-up (`backend/app/services/ml_risk_engine.py`)
@@ -106,7 +112,7 @@ ml/
 
 ## 5. Input & Output Data Contracts (API Integration)
 
-The backend endpoint (`POST /api/v1/risk/predict`) and Gantt chart consume your model using this exact contract:
+The backend endpoint (`POST /api/v1/risk/predict`) and Gantt chart consume the model using this exact contract:
 
 ### Input Payload (`POST /api/v1/risk/predict`):
 ```json
@@ -119,7 +125,7 @@ The backend endpoint (`POST /api/v1/risk/predict`) and Gantt chart consume your 
     "speed_restriction_kmh": 80.0,
     "days_overdue": 14,
     "section_gmt_density": 45.2,
-    "usfd_flaw_severity": 3,
+    "usfd_classification": "IMRW",
     "point_failure_risk": 0.0,
     "ohe_insulator_wear": 0.0
   }
@@ -135,13 +141,13 @@ The backend endpoint (`POST /api/v1/risk/predict`) and Gantt chart consume your 
   "shap_explanation": {
     "base_value": 48.2,
     "feature_attributions": {
-      "USFD Ultrasonic Rail Flaw": 36.8,
+      "USFD Ultrasonic Rail Flaw (IMRW)": 36.8,
       "Temporary Speed Restriction (TSR)": 28.2,
       "Days Maintenance Overdue": 18.4,
       "Traffic GMT Density": 5.0,
       "Track Geometry Index (TGI) Deviation": 4.2
     },
-    "human_readable_reasoning": "Job rated 88.4/100 primarily driven by USFD Ultrasonic Rail Flaw (+36.8), Temporary Speed Restriction (TSR) (+28.2), Days Maintenance Overdue (+18.4)."
+    "human_readable_reasoning": "Job rated 88.4/100 primarily driven by USFD Ultrasonic Rail Flaw (IMRW) (+36.8), Temporary Speed Restriction (TSR) (+28.2), Days Maintenance Overdue (+18.4)."
   }
 }
 ```
@@ -150,19 +156,19 @@ The backend endpoint (`POST /api/v1/risk/predict`) and Gantt chart consume your 
 
 ## 6. How to Run & Verify
 
-1. **Install ML dependencies:**
+1. **Install ML dependencies using `uv`:**
    ```bash
-   pip install -r ml/requirements-ml.txt
+   uv pip install -r ml/requirements-ml.txt
    ```
 
 2. **Generate synthetic data & train the model:**
    ```bash
-   python ml/train.py
+   uv run python ml/train.py
    ```
 
 3. **Evaluate performance metrics:**
    ```bash
-   python ml/evaluate.py
+   uv run python ml/evaluate.py
    ```
 
 4. **Verify integration with backend test suite:**

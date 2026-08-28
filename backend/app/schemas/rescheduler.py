@@ -57,6 +57,8 @@ class SLWAdvisorySchema(BaseModel):
     queued_train_priorities: List[str] = Field(default_factory=list, description="Priority passenger trains queued at block stations")
     private_number: Optional[str] = Field(None, description="Station Master Private Number (PN) exchanged for SLW introduction", examples=["PN-7392"])
     advisory_text: str = Field(..., description="Pre-formatted statutory Indian Railways telegraphic advisory notice")
+    td602_authority_sheet: Optional[Dict[str, Any]] = Field(None, description="Form T/D 602 Line Clear Ticket + Authority to Pass Signals + Caution Order sheet")
+    controller_phone_script: Optional[str] = Field(None, description="Verbatim Section Controller control-phone dispatch script")
 
 
 class RescheduleRequest(BaseModel):

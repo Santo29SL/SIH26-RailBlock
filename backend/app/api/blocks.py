@@ -25,6 +25,8 @@ from app.schemas.optimizer import (
     BDMSExportPayload,
     BDMSShadowActivity,
     FormT351NoticePayload,
+    FormTD602CautionOrder,
+    FormTD602SheetPayload,
 )
 from app.services.crud import calculate_total_pages, get_items
 
@@ -449,4 +451,80 @@ async def export_t351_notice(
         tsr_speed_kmph=meta.get("tsr_speed_kmph"),
         remarks=meta.get("approval_remarks") or meta.get("disconnection_remarks") or meta.get("notes"),
         status="RECONNECTED" if is_completed else "DISCONNECTED",
+    )
+
+
+@router.get(
+    "/{block_id}/td602-sheet",
+    response_model=FormTD602SheetPayload,
+    summary="Export Form T/D 602 Single Line Working Authority Sheet",
+)
+async def export_td602_sheet(
+    block_id: UUID,
+    pilot_train_number: Optional[str] = Query("12621", description="Pilot train number"),
+    db: AsyncSession = Depends(get_db),
+) -> FormTD602SheetPayload:
+    """Generate statutory Form T/D 602 Line Clear Ticket + Authority to Pass Signals at 'ON' + Caution Order."""
+    result = await db.execute(
+        select(Block)
+        .where(Block.id == block_id)
+        .options(selectinload(Block.section))
+    )
+    block = result.scalar_one_or_none()
+    if not block:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Block not found."
+        )
+
+    sec = block.section
+    meta = block.optimizer_metadata or {}
+    sec_code = sec.section_code if sec else "MAS-AJJ"
+    sec_name = sec.section_name if sec else "Chennai Central - Arakkonam"
+    div = sec.division if sec else "Chennai"
+    zone = sec.zone if sec else "Southern Railway"
+    pn = meta.get("disconnection_private_number") or meta.get("private_number") or f"PN-{str(block.id)[:4].upper()}"
+
+    obstructed = meta.get("line_direction", "UP") + " Main Line"
+    in_use = "DOWN Main Line" if "UP" in obstructed else "UP Main Line"
+
+    from app.services.rescheduler import (
+        generate_controller_phone_script,
+        generate_td602_authority_sheet,
+    )
+    sheet_data = generate_td602_authority_sheet(
+        section_code=sec_code,
+        section_name=sec_name,
+        obstructed_line=obstructed,
+        single_line_in_use=in_use,
+        pilot_train_number=pilot_train_number or "12621",
+        private_number=pn,
+        timestamp=datetime.now(timezone.utc),
+        division=div,
+        zone=zone,
+    )
+    script_txt = generate_controller_phone_script(
+        section_code=sec_code,
+        obstructed_line=obstructed,
+        single_line_in_use=in_use,
+        pilot_train_number=pilot_train_number or "12621",
+        private_number=pn,
+    )
+
+    return FormTD602SheetPayload(
+        form_name=sheet_data["form_name"],
+        form_title=sheet_data["form_title"],
+        statutory_rule=sheet_data["statutory_rule"],
+        division=sheet_data["division"],
+        zone=sheet_data["zone"],
+        section_code=sheet_data["section_code"],
+        section_name=sheet_data["section_name"],
+        date_time=sheet_data["date_time"],
+        line_obstructed=sheet_data["line_obstructed"],
+        line_in_use=sheet_data["line_in_use"],
+        pilot_train_number=sheet_data["pilot_train_number"],
+        station_master_private_number=sheet_data["station_master_private_number"],
+        part_1_line_clear_ticket=sheet_data["part_1_line_clear_ticket"],
+        part_2_authority_to_pass_signals_at_on=sheet_data["part_2_authority_to_pass_signals_at_on"],
+        part_3_caution_order=FormTD602CautionOrder(**sheet_data["part_3_caution_order"]),
+        controller_phone_script=script_txt,
     )

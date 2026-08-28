@@ -4,8 +4,10 @@ Provides human-explainable feature attributions and section controller reasoning
 for maintenance requests scored by the AI Risk Engine.
 """
 
-import os
+from __future__ import annotations
+
 import logging
+import os
 import joblib
 import pandas as pd
 import shap
@@ -20,10 +22,18 @@ FEATURE_COLUMNS = [
     "days_overdue",
     "section_gmt_density",
     "department_code",
-    "usfd_flaw_severity",
+    "usfd_classification",
     "point_failure_risk",
     "ohe_insulator_wear",
 ]
+
+USFD_NAMES = {
+    0: "Good",
+    1: "OBS",
+    2: "OBSW",
+    3: "IMR",
+    4: "IMRW",
+}
 
 FEATURE_READABLE_NAMES = {
     "tgi_deviation": "Track Geometry Index (TGI) Deviation",
@@ -31,10 +41,11 @@ FEATURE_READABLE_NAMES = {
     "days_overdue": "Days Maintenance Overdue",
     "section_gmt_density": "Traffic GMT Density",
     "department_code": "Department Type",
-    "usfd_flaw_severity": "USFD Ultrasonic Rail Flaw",
+    "usfd_classification": "USFD Ultrasonic Rail Flaw",
     "point_failure_risk": "S&T Point Failure Risk",
     "ohe_insulator_wear": "TRD OHE Wire Wear",
 }
+
 
 class RiskExplainer:
     """SHAP Explainer and controller reasoning builder."""
@@ -76,8 +87,14 @@ class RiskExplainer:
         attributions = {}
         top_positive_impacts = []
 
+        usfd_code = int(features_dict.get("usfd_classification", 0))
+        usfd_tag = USFD_NAMES.get(usfd_code, "Good")
+
         for name, val in zip(FEATURE_COLUMNS, vals):
-            readable = FEATURE_READABLE_NAMES.get(name, name)
+            if name == "usfd_classification":
+                readable = f"USFD Ultrasonic Rail Flaw ({usfd_tag})" if usfd_code > 0 else "USFD Ultrasonic Rail Flaw (Good)"
+            else:
+                readable = FEATURE_READABLE_NAMES.get(name, name)
             impact = round(float(val), 2)
             attributions[readable] = impact
             if impact > 2.0:
@@ -102,6 +119,7 @@ class RiskExplainer:
             "human_readable_reasoning": reasoning,
         }
 
+
 if __name__ == "__main__":
     sample_feat = {
         "tgi_deviation": 82.5,
@@ -109,7 +127,7 @@ if __name__ == "__main__":
         "days_overdue": 14.0,
         "section_gmt_density": 45.2,
         "department_code": 0,
-        "usfd_flaw_severity": 3,
+        "usfd_classification": 4,  # IMRW
         "point_failure_risk": 0.0,
         "ohe_insulator_wear": 0.0,
     }

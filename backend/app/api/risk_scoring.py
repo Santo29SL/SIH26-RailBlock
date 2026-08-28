@@ -1,50 +1,22 @@
 """Stage 2: AI Risk & Criticality Scoring API Endpoints.
 
-Provides REST APIs for XGBoost + SHAP risk scoring predictions and feature attributions.
+Provides REST APIs for Two-Mode Risk Scoring (Mode 1 Deterministic & Mode 2 XGBoost + SHAP).
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
-
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.risk import (
+    ModelInfoResponse,
+    RiskPredictionRequest,
+    RiskPredictionResponse,
+    SHAPExplanationSchema,
+    USFDClassificationEnum,
+)
 from app.services.ml_risk_engine import FEATURE_COLUMNS, risk_engine
 
 router = APIRouter(prefix="/risk", tags=["Stage 2 — AI Risk & Criticality Scoring"])
-
-
-class RiskPredictionRequest(BaseModel):
-    """Payload for maintenance request risk prediction."""
-
-    department: str = Field("TRACK", description="Department (TRACK, SIGNAL, TRACTION)")
-    activity_type: str = Field("RAIL_RENEWAL", description="Type of maintenance activity")
-    priority: Optional[str] = Field("MEDIUM", description="Priority string")
-    deadline: Optional[str] = Field(None, description="Target deadline YYYY-MM-DD")
-    metadata_json: Optional[Dict[str, Any]] = Field(
-        default_factory=dict,
-        description="Defect telemetry parameters (tgi_deviation, speed_restriction_kmh, usfd_flaw_severity, etc.)",
-    )
-
-
-class SHAPExplanationSchema(BaseModel):
-    """SHAP Explainability feature attributions."""
-
-    base_value: float = Field(..., description="Base model prediction baseline")
-    feature_attributions: Dict[str, float] = Field(..., description="Feature attribution weights")
-    human_readable_reasoning: str = Field(..., description="Human readable explanation for controllers")
-
-
-class RiskPredictionResponse(BaseModel):
-    """Response containing ML predicted criticality index and SHAP explanation."""
-
-    model_config = ConfigDict(protected_namespaces=())
-
-    criticality_index: float = Field(..., description="Predicted Criticality Index score (0 to 100)")
-    model_used: str = Field(..., description="Model identifier used for scoring")
-    shap_explanation: SHAPExplanationSchema = Field(..., description="SHAP feature attribution breakdown")
-    extracted_features: Dict[str, float] = Field(..., description="Extracted feature vector fed into model")
 
 
 @router.post(
@@ -53,22 +25,23 @@ class RiskPredictionResponse(BaseModel):
     status_code=status.HTTP_200_OK,
     summary="Predict Risk & Criticality Score with SHAP Explanation",
     description=(
-        "Evaluates a maintenance request using XGBoost Gradient Boosted Trees and SHAP XAI. "
-        "Returns dynamic Criticality Index (0-100) and human-readable feature impact reasoning."
+        "Evaluates a maintenance request using the Two-Mode AI Risk Engine (Mode 1 Deterministic or "
+        "Mode 2 Gradient Boosted Trees + SHAP XAI). Returns dynamic Criticality Index (0-100) and feature attributions."
     ),
 )
 async def predict_request_risk(req: RiskPredictionRequest) -> RiskPredictionResponse:
     """Predict risk score using Stage 2 ML engine."""
     try:
-        req_dict = req.model_dump()
-        extracted = risk_engine.extract_features(req_dict)
-        prediction = risk_engine.predict_risk(req_dict)
+        req_dict = req.model_dump(by_alias=True)
+        prediction = risk_engine.predict_risk(req_dict, scoring_mode=req.scoring_mode.value)
 
         return RiskPredictionResponse(
+            request_code=prediction.get("request_code"),
             criticality_index=prediction["criticality_index"],
             model_used=prediction["model_used"],
+            scoring_mode=prediction["scoring_mode"],
             shap_explanation=SHAPExplanationSchema(**prediction["shap_explanation"]),
-            extracted_features=extracted,
+            extracted_features=prediction["extracted_features"],
         )
     except Exception as exc:
         raise HTTPException(
@@ -79,15 +52,20 @@ async def predict_request_risk(req: RiskPredictionRequest) -> RiskPredictionResp
 
 @router.get(
     "/model-info",
+    response_model=ModelInfoResponse,
     status_code=status.HTTP_200_OK,
     summary="Get Stage 2 Risk Model & SHAP Metadata",
 )
-async def get_model_info():
-    """Return model status and feature definitions."""
-    return {
-        "stage": "Stage 2: AI Risk & Criticality Scoring Engine",
-        "status": "ready" if risk_engine.model is not None else "degraded",
-        "algorithm": risk_engine.algorithm_name,
-        "features": FEATURE_COLUMNS,
-        "version": risk_engine.model_version,
-    }
+async def get_model_info() -> ModelInfoResponse:
+    """Return model status, active mode, and feature definitions."""
+    has_model = risk_engine.model is not None
+    return ModelInfoResponse(
+        stage="Stage 2: AI Risk & Criticality Scoring Engine",
+        status="ready" if has_model else "degraded",
+        active_scoring_mode="MODE_2_ML_SHAP" if has_model else "MODE_1_DETERMINISTIC",
+        algorithm=risk_engine.algorithm_name,
+        features=FEATURE_COLUMNS,
+        supported_usfd_classes=[e.value for e in USFDClassificationEnum],
+        version=risk_engine.model_version,
+    )
+

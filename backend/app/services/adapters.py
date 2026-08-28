@@ -25,12 +25,30 @@ class LegacySystemAdapter:
     async def ingest_tms_defect(
         db: AsyncSession,
         section_id: uuid.UUID,
-        usfd_flaw_severity: int = 2,
+        usfd_classification: str = "IMR",
+        usfd_flaw_severity: Optional[int] = None,
         tgi_deviation: float = 82.5,
         chainage_km: float = 142.5,
+        curvature_deg: float = 0.0,
         estimated_duration_min: int = 150,
     ) -> MaintenanceRequest:
-        """Ingest track defect from TMS (Track Management System)."""
+        """Ingest track defect from TMS with IRPWM USFD classification and Curvature."""
+        # Map USFD classification string to severity and priority
+        usfd_upper = (usfd_classification or "GOOD").upper()
+        if usfd_flaw_severity is None:
+            if usfd_upper in ("IMRW", "IMR"):
+                severity = 3 if usfd_upper == "IMRW" else 2
+                prio = Priority.CRITICAL.value if usfd_upper == "IMRW" else Priority.HIGH.value
+            elif usfd_upper in ("OBSW", "OBS"):
+                severity = 2 if usfd_upper == "OBSW" else 1
+                prio = Priority.HIGH.value if usfd_upper == "OBSW" else Priority.MEDIUM.value
+            else:
+                severity = 0
+                prio = Priority.LOW.value
+        else:
+            severity = usfd_flaw_severity
+            prio = Priority.HIGH.value if severity >= 2 else Priority.MEDIUM.value
+
         req_code = f"TMS-{uuid.uuid4().hex[:6].upper()}"
         req = MaintenanceRequest(
             request_code=req_code,
@@ -38,16 +56,19 @@ class LegacySystemAdapter:
             department=Department.TRACK.value,
             activity_type="RAIL_RENEWAL_USFD",
             duration_minutes=estimated_duration_min,
-            priority=Priority.HIGH.value if usfd_flaw_severity >= 2 else Priority.MEDIUM.value,
+            priority=prio,
             deadline=date.today() + timedelta(days=3),
             status=MaintenanceStatus.PENDING.value,
             metadata_json={
                 "source_system": "TMS",
-                "usfd_flaw_severity": usfd_flaw_severity,
+                "usfd_classification": usfd_upper,
+                "usfd_flaw_severity": severity,
+                "flaw_category": "T1" if usfd_upper in ("IMR", "IMRW") else ("T2" if usfd_upper in ("OBS", "OBSW") else "NONE"),
                 "tgi_deviation": tgi_deviation,
                 "chainage_start_km": chainage_km,
                 "chainage_end_km": chainage_km + 2.5,
-                "speed_restriction_kmh": 30.0,
+                "curvature_deg": curvature_deg,
+                "speed_restriction_kmh": 30.0 if severity >= 2 else 50.0,
             },
         )
         db.add(req)

@@ -854,3 +854,70 @@ async def test_optimizer_run_empty_section(client: AsyncClient):
     assert data["total_blocks_scheduled"] == 0
     assert data["total_maintenance_requests_covered"] == 0
 
+
+@pytest.mark.asyncio
+async def test_export_td602_sheet(client: AsyncClient):
+    """Test GET /api/v1/blocks/{block_id}/td602-sheet returns Form T/D 602 Authority payload."""
+    target_date = date(2026, 8, 25)
+    setup = await _setup_test_corridor(client, target_date)
+
+    run_resp = await client.post(
+        OPTIMIZER_RUN_URL,
+        json={
+            "target_date": target_date.isoformat(),
+            "section_ids": [setup["section_id"]],
+            "persist_to_db": True,
+        },
+    )
+    block_id = run_resp.json()["scheduled_blocks"][0]["id"]
+
+    resp = await client.get(
+        f"{BLOCKS_URL}/{block_id}/td602-sheet?pilot_train_number=12621"
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["form_name"] == "Form T/D 602"
+    assert data["statutory_rule"] == "GR 3.68, SR 4.42, SR 4.09 & SR Chapter 15"
+    assert data["section_code"] == setup["section_code"]
+    assert data["pilot_train_number"] == "12621"
+    assert "part_1_line_clear_ticket" in data
+    assert "part_2_authority_to_pass_signals_at_on" in data
+    assert data["part_3_caution_order"]["pilot_train_speed"] == "25 km/h (Day/Night pilot speed ceiling)"
+    assert data["part_3_caution_order"]["facing_points_speed"] == "15 km/h over all facing points and crossovers"
+    assert "CONTROL PHONE SCRIPT" in data["controller_phone_script"]
+
+
+@pytest.mark.asyncio
+async def test_optimizer_multi_horizon_weekly_and_monthly_run(client: AsyncClient):
+    """Test multi-horizon weekly (7-day) and monthly (30-day) optimizer runs."""
+    target_date = date(2026, 8, 25)
+    setup = await _setup_test_corridor(client, target_date)
+
+    # 7-day weekly run
+    run_7d = await client.post(
+        OPTIMIZER_RUN_URL,
+        json={
+            "target_date": target_date.isoformat(),
+            "section_ids": [setup["section_id"]],
+            "horizon_days": 7,
+            "persist_to_db": False,
+        },
+    )
+    assert run_7d.status_code == 200
+    assert run_7d.json()["solver_status"] in ("OPTIMAL", "FEASIBLE")
+
+    # 30-day monthly run
+    run_30d = await client.post(
+        OPTIMIZER_RUN_URL,
+        json={
+            "target_date": target_date.isoformat(),
+            "section_ids": [setup["section_id"]],
+            "horizon_days": 30,
+            "persist_to_db": False,
+        },
+    )
+    assert run_30d.status_code == 200
+    assert run_30d.json()["solver_status"] in ("OPTIMAL", "FEASIBLE")
+
+

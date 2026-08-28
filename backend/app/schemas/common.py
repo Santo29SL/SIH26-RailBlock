@@ -61,6 +61,25 @@ class LineTypeEnum(str, enum.Enum):
     QUADRUPLE = "QUADRUPLE"
 
 
+class UserRoleEnum(str, enum.Enum):
+    ADMIN = "ADMIN"
+    SECTION_CONTROLLER = "SECTION_CONTROLLER"
+    STATION_MASTER = "STATION_MASTER"
+    DEPARTMENT_ENGINEER = "DEPARTMENT_ENGINEER"
+    DIVISIONAL_AUTHORITY = "DIVISIONAL_AUTHORITY"
+
+
+RoleEnum = UserRoleEnum
+
+
+class USFDClassificationEnum(str, enum.Enum):
+    GOOD = "GOOD"
+    IMR = "IMR"
+    IMRW = "IMRW"
+    OBS = "OBS"
+    OBSW = "OBSW"
+
+
 # ── Pagination ───────────────────────────────────────
 
 T = TypeVar("T")

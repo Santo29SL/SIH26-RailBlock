@@ -52,7 +52,9 @@ from app.services.rescheduler import (
     ScheduledBlockPlan,
     apply_greedy_time_shift,
     format_slw_advisory_text,
+    generate_controller_phone_script,
     generate_slw_advisory,
+    generate_td602_authority_sheet,
     reschedule_on_disruption,
 )
 
@@ -547,3 +549,39 @@ def test_performance_sub_millisecond_benchmark(sample_scheduled_block: Scheduled
 
     assert t_total < 0.5  # 1000 runs in under 500ms
     assert avg_ms < 0.5   # Under 0.5ms per reschedule
+
+
+def test_td602_authority_sheet_and_phone_script_generation():
+    """Verify structured Form T/D 602 Authority sheet and Section Controller phone script."""
+    ts = datetime(2026, 8, 25, 12, 30, 0)
+    sheet = generate_td602_authority_sheet(
+        section_code="MAS-AJJ",
+        section_name="Chennai Central - Arakkonam",
+        obstructed_line="UP Main Line",
+        single_line_in_use="DOWN Main Line",
+        pilot_train_number="12621",
+        private_number="PN-9988",
+        timestamp=ts,
+        division="Chennai",
+        zone="Southern Railway",
+    )
+
+    assert sheet["form_name"] == "Form T/D 602"
+    assert sheet["statutory_rule"] == "GR 3.68, SR 4.42, SR 4.09 & SR Chapter 15"
+    assert sheet["section_code"] == "MAS-AJJ"
+    assert sheet["pilot_train_number"] == "12621"
+    assert sheet["station_master_private_number"] == "PN-9988"
+    assert sheet["part_3_caution_order"]["pilot_train_speed"] == "25 km/h (Day/Night pilot speed ceiling)"
+    assert sheet["part_3_caution_order"]["facing_points_speed"] == "15 km/h over all facing points and crossovers"
+
+    script = generate_controller_phone_script(
+        section_code="MAS-AJJ",
+        obstructed_line="UP Main Line",
+        single_line_in_use="DOWN Main Line",
+        pilot_train_number="12621",
+        private_number="PN-9988",
+    )
+    assert "[CONTROL PHONE SCRIPT - SECTION CONTROLLER TO ALL STATIONS MAS-AJJ]" in script
+    assert "First Pilot Train is 12621" in script
+    assert "PN-9988" in script
+

@@ -66,3 +66,26 @@ class LineType(str, enum.Enum):
     DOUBLE = "DOUBLE"
     TRIPLE = "TRIPLE"
     QUADRUPLE = "QUADRUPLE"
+
+
+class USFDClassification(str, enum.Enum):
+    """Ultrasonic Flaw Detection (USFD) rail flaw classifications per IRPWM."""
+
+    GOOD = "GOOD"
+    IMR = "IMR"      # Immediate Removal (T1 flaw)
+    IMRW = "IMRW"    # Immediate Removal Weld (T1 flaw)
+    OBS = "OBS"      # Observed (T2 flaw)
+    OBSW = "OBSW"    # Observed Weld (T2 flaw)
+
+
+class UserRole(str, enum.Enum):
+    """User roles for RailBlock RBAC (4+1 Tier)."""
+
+    ADMIN = "ADMIN"
+    SECTION_CONTROLLER = "SECTION_CONTROLLER"
+    STATION_MASTER = "STATION_MASTER"
+    DEPARTMENT_ENGINEER = "DEPARTMENT_ENGINEER"
+    DIVISIONAL_AUTHORITY = "DIVISIONAL_AUTHORITY"
+
+
+RoleEnum = UserRole

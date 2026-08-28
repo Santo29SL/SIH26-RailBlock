@@ -5,8 +5,10 @@ computes R², RMSE, and MAE test metrics, and exports feature importance & SHAP 
 to ml/reports/.
 """
 
-import os
+from __future__ import annotations
+
 import logging
+import os
 import joblib
 import numpy as np
 import pandas as pd
@@ -32,11 +34,12 @@ FEATURE_COLUMNS = [
     "days_overdue",
     "section_gmt_density",
     "department_code",
-    "usfd_flaw_severity",
+    "usfd_classification",
     "point_failure_risk",
     "ohe_insulator_wear",
 ]
 TARGET_COLUMN = "criticality_index"
+
 
 def evaluate_model():
     """Evaluate trained model artifact and save visual SHAP diagnostic reports."""
@@ -47,6 +50,9 @@ def evaluate_model():
     model = joblib.load(MODEL_PATH)
 
     df = pd.read_csv(DATA_PATH)
+    if "usfd_flaw_severity" in df.columns and "usfd_classification" not in df.columns:
+        df["usfd_classification"] = df["usfd_flaw_severity"]
+
     X = df[FEATURE_COLUMNS]
     y = df[TARGET_COLUMN]
 
@@ -66,15 +72,15 @@ def evaluate_model():
     os.makedirs(REPORTS_DIR, exist_ok=True)
 
     # 1. Feature Importance Plot
-    plt.figure(figsize=(8, 5))
+    plt.figure(figsize=(9, 5))
     if hasattr(model, "feature_importances_"):
         importances = model.feature_importances_
     else:
         importances = np.ones(len(FEATURE_COLUMNS)) / len(FEATURE_COLUMNS)
 
     feat_df = pd.DataFrame({"Feature": FEATURE_COLUMNS, "Importance": importances}).sort_values(by="Importance", ascending=False)
-    sns.barplot(data=feat_df, x="Importance", y="Feature", palette="viridis")
-    plt.title("XGBoost/ML Feature Importance — Criticality Index Scoring")
+    sns.barplot(data=feat_df, x="Importance", y="Feature", hue="Feature", palette="viridis", legend=False)
+    plt.title("Tree-Based Feature Importance — Criticality Index Scoring", fontsize=12, fontweight="bold")
     plt.xlabel("Relative Importance Score")
     plt.tight_layout()
     feat_plot_path = os.path.join(REPORTS_DIR, "feature_importance.png")
@@ -89,7 +95,7 @@ def evaluate_model():
 
         plt.figure(figsize=(10, 6))
         shap.summary_plot(shap_values, X_test, show=False)
-        plt.title("SHAP Feature Attribution Beeswarm — RailBlock Risk Engine", fontsize=12)
+        plt.title("SHAP Feature Attribution Beeswarm — RailBlock Risk Engine", fontsize=12, fontweight="bold")
         plt.tight_layout()
         shap_plot_path = os.path.join(REPORTS_DIR, "shap_beeswarm_summary.png")
         plt.savefig(shap_plot_path, dpi=300)
@@ -97,6 +103,7 @@ def evaluate_model():
         logger.info(f"✅ Saved SHAP Beeswarm plot to {shap_plot_path}")
     except Exception as e:
         logger.warning(f"Could not generate SHAP plot: {e}")
+
 
 if __name__ == "__main__":
     evaluate_model()

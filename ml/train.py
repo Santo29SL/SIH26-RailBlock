@@ -1,12 +1,14 @@
 """Model Training & Optuna Hyperparameter Optimization Pipeline.
 
 Loads ir_defects_dataset.csv, executes 5-fold cross-validation with Optuna hyperparameter tuning
-across XGBoost, LightGBM, and CatBoost, selects the winning model, and exports the final model
-checkpoint to backend/data/ml_models/criticality_xgboost_v2.joblib.
+across XGBoost, LightGBM, and CatBoost, selects the winning model family, and exports the final model
+checkpoint to backend/data/ml_models/criticality_xgboost_v2.joblib and ml/models/criticality_xgboost_v2.joblib.
 """
 
-import os
+from __future__ import annotations
+
 import logging
+import os
 import joblib
 import numpy as np
 import pandas as pd
@@ -18,14 +20,15 @@ import xgboost as xgb
 import lightgbm as lgb
 from catboost import CatBoostRegressor
 
-# Suppress Optuna verbose logging
+# Suppress verbose logging
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "ir_defects_dataset.csv")
-MODEL_EXPORT_DIR = os.path.join(os.path.dirname(__file__), "..", "backend", "data", "ml_models")
-MODEL_EXPORT_PATH = os.path.join(MODEL_EXPORT_DIR, "criticality_xgboost_v2.joblib")
+BACKEND_MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "backend", "data", "ml_models")
+LOCAL_MODEL_DIR = os.path.join(os.path.dirname(__file__), "models")
+MODEL_FILENAME = "criticality_xgboost_v2.joblib"
 
 FEATURE_COLUMNS = [
     "tgi_deviation",
@@ -33,11 +36,12 @@ FEATURE_COLUMNS = [
     "days_overdue",
     "section_gmt_density",
     "department_code",
-    "usfd_flaw_severity",
+    "usfd_classification",
     "point_failure_risk",
     "ohe_insulator_wear",
 ]
 TARGET_COLUMN = "criticality_index"
+
 
 def train_and_optimize():
     """Train XGBoost, LightGBM, and CatBoost with Optuna hyperparameter optimization."""
@@ -46,6 +50,10 @@ def train_and_optimize():
 
     logger.info(f"Loading dataset from {DATA_PATH}...")
     df = pd.read_csv(DATA_PATH)
+
+    # Handle backward compatibility if legacy column exists
+    if "usfd_flaw_severity" in df.columns and "usfd_classification" not in df.columns:
+        df["usfd_classification"] = df["usfd_flaw_severity"]
 
     X = df[FEATURE_COLUMNS]
     y = df[TARGET_COLUMN]
@@ -74,7 +82,7 @@ def train_and_optimize():
             model.fit(X_tr, y_tr)
             preds = model.predict(X_val)
             rmses.append(np.sqrt(mean_squared_error(y_val, preds)))
-        return np.mean(rmses)
+        return float(np.mean(rmses))
 
     study_xgb = optuna.create_study(direction="minimize")
     study_xgb.optimize(objective_xgb, n_trials=15)
@@ -99,7 +107,7 @@ def train_and_optimize():
             model.fit(X_tr, y_tr)
             preds = model.predict(X_val)
             rmses.append(np.sqrt(mean_squared_error(y_val, preds)))
-        return np.mean(rmses)
+        return float(np.mean(rmses))
 
     study_lgb = optuna.create_study(direction="minimize")
     study_lgb.optimize(objective_lgb, n_trials=15)
@@ -123,7 +131,7 @@ def train_and_optimize():
             model.fit(X_tr, y_tr)
             preds = model.predict(X_val)
             rmses.append(np.sqrt(mean_squared_error(y_val, preds)))
-        return np.mean(rmses)
+        return float(np.mean(rmses))
 
     study_cb = optuna.create_study(direction="minimize")
     study_cb.optimize(objective_cb, n_trials=15)
@@ -161,11 +169,17 @@ def train_and_optimize():
     test_mae = mean_absolute_error(y_test, test_preds)
 
     logger.info(f"📊 Final Test Evaluation — R²: {test_r2:.4f} | RMSE: {test_rmse:.4f} | MAE: {test_mae:.4f}")
+    assert test_r2 >= 0.95, f"R² {test_r2} below specification threshold 0.95"
+    assert test_rmse <= 3.5, f"RMSE {test_rmse} exceeds specification ceiling 3.5"
+    assert test_mae <= 2.5, f"MAE {test_mae} exceeds specification ceiling 2.5"
 
-    # Save model artifact
-    os.makedirs(MODEL_EXPORT_DIR, exist_ok=True)
-    joblib.dump(final_model, MODEL_EXPORT_PATH)
-    logger.info(f"✅ Production Model exported to {MODEL_EXPORT_PATH}")
+    # Save model artifacts
+    for out_dir in [BACKEND_MODEL_DIR, LOCAL_MODEL_DIR]:
+        os.makedirs(out_dir, exist_ok=True)
+        out_path = os.path.join(out_dir, MODEL_FILENAME)
+        joblib.dump(final_model, out_path)
+        logger.info(f"✅ Production Model exported to {out_path}")
+
 
 if __name__ == "__main__":
     train_and_optimize()
