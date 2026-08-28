@@ -40,14 +40,14 @@ The following matrix defines the formal mapping between the functional mandates 
 | **4** | **Train Timetable Protection** | Maintenance possession conflicting with high-priority passenger runs | **Stage 5: Two-Tier Constraint Optimization Engine** | Assignment formulation via Google OR-Tools CP-SAT (constraint programming) (Ji et al., 2026; Zhang, Gao et al., 2019; Peng & Ouyang, 2011) | **Exact Mathematical Coverage** (VIP zero-detention, gap exclusivity, machine capacity limits) |
 | **5** | **Real-Time Disruption Adaptability** | Dynamic train delays invalidating pre-scheduled static block plans | **Stage 6: Real-Time Rescheduling & SLW Fallback** | WebSocket Telemetry Stream + Fast Heuristics + SLW Protocol (Zhang, D'Ariano, He & Peng, 2019; Luan et al., 2017) | **Sub-Second Adaptability** (Auto-reschedule for delays $>20$ min with Burst Block protection) |
 | **6** | **Controller Decision Support** | Manual cross-departmental coordination lacking visual simulation tools | **Stage 7: Control Office Dashboard & Form T/351 Workflow** | React.js / Leaflet GIS Map + Dual Gantt + Digital Draft BDMS Push | **Full Operational Coverage** (Direct BDMS / COA Draft integration + Form T/351 G&SR compliance) |
-| **7** | **Multi-Horizon Planning (weekly & monthly)** | Static single-horizon plans unable to support long-term maintenance | **Stage 7: Multi-Horizon Planner (7-day / 30-day re-run of Stage 5)** | Rolling-horizon re-optimization | **PS-mandated coverage** (weekly + monthly block plans generated from the same optimizer) |
+| **7** | **Multi-Horizon Planning (weekly & monthly)** | Static single-horizon plans unable to support long-term maintenance | **Stage 7: Multi-Horizon Planner (7-day / 30-day re-run of Stage 5)** | Rolling-horizon re-optimization | **PS-mandated coverage** (weekly + monthly block plans generated from the same optimizer), exposed via POST /api/v1/optimizer/run?horizon_days=7|30. |
 
 ### 2.1 Quantitative Operational Performance Metrics
 
 The architectural design targets the following empirical performance benchmarks across section operations:
 
 - **Track Downtime Efficiency:** Reduces cumulative track possession time per section from 5.5 hours (uncoordinated solo blocks) to 2.5 hours (Joint Shadow Block), yielding a **peak theoretical recovery of 55%** and an **empirical operational recovery averaging 25% – 35%** across routine multi-department schedules.
-- **Possession Proposal Latency (Two-Tier Architecture):** Heavy CP-SAT optimization runs **offline as a nightly batch job (Apache Airflow DAG in production; APScheduler/CLI trigger in the MVP)** for base 7-day plans, while **real-time dynamic rescheduling uses fast greedy heuristics ($< 30$ seconds)** for localized time shifts when train delays occur.
+- **Possession Proposal Latency (Two-Tier Architecture):** Heavy CP-SAT optimization runs **offline as a nightly batch job (Apache Airflow DAG in production; APScheduler/CLI trigger in the MVP)** for base 7-day plans, while **real-time dynamic rescheduling is sub-second end-to-end (the block time-shift itself executes in $< 1\text{ ms}$)** for localized time shifts when train delays occur.
 - **Network Train Detention:** Minimizes delay propagation across passenger corridors, targeting up to a **70% reduction in total train detention minutes** (accounting for IRPWM post-maintenance Temporary Speed Restriction recovery curves). This figure is a **simulation-based target**, to be validated via Monte Carlo simulation over synthetic scenarios (see Simulation & Validation Methodology section); field validation requires a CRIS pilot deployment.
 
 ---
@@ -111,7 +111,7 @@ flowchart TD
 | Tier | Technologies & Frameworks | Implemented Responsibilities |
 | :--- | :--- | :--- |
 | **Backend API & Core** | Python 3.12, FastAPI, Pydantic v2, `uv` | High-performance asynchronous REST APIs, dependency injection, and data validation |
-| **Authentication & Security** | OAuth2 Password Bearer, JWT (`python-jose`), `passlib[bcrypt]` | Token issuing, password hashing, 4+1-tier Role-Based Access Control (RBAC) |
+| **Authentication & Security** | OAuth2 Password Bearer, JWT (`python-jose`), `passlib[bcrypt]` | Token issuing, password hashing, Role-Based Access Control (4+1-tier RBAC) |
 | **Middleware & Reliability** | `slowapi` (Limiter), `structlog`, OWASP Security Headers | 120 req/min rate limiting, structured JSON logging, XSS/Clickjacking protection |
 | **Optimization Solver** | Google OR-Tools (CP-SAT — constraint programming) | Candidate-block-to-corridor-gap assignment optimization with Tier-1 VIP protection and machine capacity limits |
 | **AI / ML & Explainability** | Python, `scikit-learn`, `xgboost`, `lightgbm`, `shap` | Dynamic Criticality Index ($CI \in [0, 100]$) and SHAP feature attribution |
@@ -131,7 +131,7 @@ flowchart TD
   * `TMSAdapter` (`POST /api/v1/ingest/tms`): Track Geometry Index (TGI - combining Gauge, Cross-Level, Twist, Longitudinal Level, Alignment, and Curvature), Ultrasonic Flaw Detection (USFD) rail flaw classification per Indian Railways practice — **Good / IMR / IMRW / OBS / OBSW** (tabulated as T1 = IMR/IMRW, T2 = OBS/OBSW) with GMT-based re-test intervals — plus chainage markers and duration.
   * `SMMSAdapter` (`POST /api/v1/ingest/smms`): Point machine electromechanical locking risk score, station codes, and asset IDs.
   * `TDMSAdapter` (`POST /api/v1/ingest/tdms`): OHE contact wire wear percentage, Substation Feeding Post (FP) identifiers, and power isolation flags.
-  * `COAAdapter`: Train timetable numbers, departure/arrival times, priority classes, and section movement schedules.
+  * `COAAdapter`: Train timetable numbers, departure/arrival times, priority classes, section movement schedules, **and the goods trains forecast from the Control Office (anticipated freight paths for the planning horizon, not yet present in the published timetable)**.
 
 ---
 
@@ -140,6 +140,7 @@ flowchart TD
 * **Deterministic Fallback & Baseline Formula (v1):**
   $$CI = 0.30 \cdot \text{TGI\_Deviation} + 0.25 \cdot \frac{\Delta v_{\text{SpeedRestriction}}}{1.2} + 0.20 \cdot \frac{\min(\text{DaysOverdue}, 60)}{60} \cdot 100 + 0.15 \cdot \frac{\text{SectionGMTDensity}}{1.5} + \text{DefectSeverityPenalty}$$
 * **Severity Mapping:** The severity term is driven by the statutory USFD classification ordinal (`Good=0 < OBS=1 < OBSW=2 < IMR=3 < IMRW=4`, per IRPWM T1/T2 tabulation), with `IMRW` (+35) and `IMR` (+25) (T1) receiving the highest penalties, followed by `OBSW` (+10) and `OBS` (+5) (T2).
+* **Availability-Impact Dimension:** the speed-restriction delta ($\text{MPS} - v_{\text{TSR}}$) serves as the direct measure of impact on asset availability — an active TSR on a high-MPS line measurably reduces corridor capacity — so degraded assets that restrict traffic score higher on this PS-mandated dimension, independent of failure risk.
 * **Explainable AI (XAI):** Uses SHAP (SHapley Additive exPlanations) (Lundberg & Lee, 2017) in probability space satisfying $\text{base\_value} + \sum \phi_i \approx P(\text{failure})$ to output human-readable reasoning for railway controllers (e.g., *"Base failure rate 8%. USFD IMR flaw +21 pts, 80 km/h TSR +14, 14 days overdue +9, heavy-freight section +6, TGI deviation +3 → 61% simulated 30-day failure probability; CI 88 = riskier than 88% of the current backlog"*).
 * **Two-Mode Scoring Engine:** The deployed primary (v2) is an XGBoost/LightGBM model trained on simulated degradation-failure outcomes from the Synthetic Seed Sandbox (hazard-based labels with domain randomization), isotonic-calibrated and served with probability-space SHAP attributions. The deterministic fallback and ablation baseline (v1) is a transparent expert-weighted linear CI used when the model artifact is unavailable and as the comparison baseline in evaluation. Both modes are retrained/recalibrated on real labeled outcomes once a CRIS pilot accrues failure history; the API contract is identical across modes.
 * **Endpoints:** `POST /api/v1/risk/predict` and `GET /api/v1/risk/model-info`.
@@ -154,6 +155,7 @@ flowchart TD
   3. **Duration Filtering:** Filters out idle slots shorter than the minimum block threshold ($\Delta T < 60\text{ mins}$).
   4. **Directional Tracking:** Segregates gaps by line direction (`UP`, `DOWN`, `BOTH`, `SINGLE`) with train parity heuristics (even=UP, odd=DOWN).
   5. **VIP Proximity Detection:** Flags adjacency to high-priority express runs (Rajdhani, Vande Bharat, Shatabdi, Tejas, Duronto, Gatimaan).
+  6. **Freight Forecast Overlay:** Anticipated goods-train paths from the COA goods trains forecast are included as corridor occupancy for the planning horizon — timetable movements cover the near term, while forecast freight paths (flagged FORECAST_FREIGHT) occupy future corridor capacity in monthly views, so extracted gaps reflect both scheduled and forecast demand before candidate blocks are formed.
 
 ---
 
@@ -378,7 +380,7 @@ All endpoints are hosted under prefix `/api/v1`:
 | | `GET` | `/api/v1/blocks/{id}/export-bdms`| Export CRIS BDMS JSON draft block format | Controller |
 | | `GET` | `/api/v1/blocks/{id}/t351-notice`| Export Form T/351 Disconnection Notice payload | Station Master |
 | | `GET` | `/api/v1/blocks/{id}/td602-sheet`| Export Form T/D 602 SLW authority & caution order support sheet | Station Master / Controller |
-| **Optimizer** | `POST` | `/api/v1/optimizer/run` | Execute Stages 3 $\to$ 4 $\to$ 5 solver & persist | Controller |
+| **Optimizer** | `POST` | `/api/v1/optimizer/run?horizon_days=7|30` | Execute Stages 3 $\to$ 4 $\to$ 5 solver over the requested horizon (7 = weekly plan, 30 = monthly plan) & persist | Controller |
 | | `POST` | `/api/v1/optimizer/simulate` | In-memory What-If simulation with HMAC token | Controller |
 | | `POST` | `/api/v1/optimizer/commit-simulation`| Commit simulated schedule using HMAC token | Controller |
 | | `POST` | `/api/v1/optimizer/reschedule`| Real-time fast rescheduling & SLW fallback | Controller |
@@ -400,9 +402,10 @@ All quantitative targets (shadow-block downtime recovery, detention reduction) a
 ## 6.6 Three-Minute Demo Script
 1. **(0:00–0:40) The Problem:** Show the uncoordinated Gantt — three separate department blocks on one section = 5.5 hrs track closed.
 2. **(0:40–1:30) The AI:** Ingest synthetic defects via the TMS/SMMS/TDMS adapters; show Criticality Index scores with SHAP-style reasoning.
-3. **(1:30–2:15) The Optimization:** Click "Optimize" — CP-SAT assigns a joint Shadow Block; track closed time drops to 2.5 hrs (55% reduction).
-4. **(2:15–2:45) Real-Time Resilience:** Inject a mock 25-minute train delay via the Simulated COA Event Injector; watch the fast heuristic reschedule within seconds, VIP trains untouched.
-5. **(2:45–3:00) Statutory Closure:** Push the draft block to BDMS JSON export + Form T/351 notice with Private Number state machine.
+3. **(1:30–1:55) The Optimization:** Click "Optimize" — CP-SAT assigns a joint Shadow Block; track closed time drops to 2.5 hrs (55% reduction).
+4. **(1:55–2:15) Monthly Horizon:** Toggle horizon_days to 30 — the planner re-runs CP-SAT over the monthly corridor view; the monthly block plan renders, and forecast freight paths (beyond the timetable) are visibly already occupying future capacity.
+5. **(2:15–2:45) Real-Time Resilience:** Inject a mock 25-minute train delay via the Simulated COA Event Injector; watch the fast heuristic reschedule within seconds, VIP trains untouched.
+6. **(2:45–3:00) Statutory Closure:** Push the draft block to BDMS JSON export + Form T/351 notice with Private Number state machine.
 
 ---
 

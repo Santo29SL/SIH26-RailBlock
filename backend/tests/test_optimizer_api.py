@@ -890,11 +890,11 @@ async def test_export_td602_sheet(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_optimizer_multi_horizon_weekly_and_monthly_run(client: AsyncClient):
-    """Test multi-horizon weekly (7-day) and monthly (30-day) optimizer runs."""
+    """Test multi-horizon weekly (7-day) and monthly (30-day) optimizer runs via body and query params."""
     target_date = date(2026, 8, 25)
     setup = await _setup_test_corridor(client, target_date)
 
-    # 7-day weekly run
+    # 1. 7-day weekly run via JSON body
     run_7d = await client.post(
         OPTIMIZER_RUN_URL,
         json={
@@ -905,19 +905,76 @@ async def test_optimizer_multi_horizon_weekly_and_monthly_run(client: AsyncClien
         },
     )
     assert run_7d.status_code == 200
-    assert run_7d.json()["solver_status"] in ("OPTIMAL", "FEASIBLE")
+    data_7d = run_7d.json()
+    assert data_7d["solver_status"] in ("OPTIMAL", "FEASIBLE")
 
-    # 30-day monthly run
+    # 2. 30-day monthly run via query parameter POST /api/v1/optimizer/run?horizon_days=30
     run_30d = await client.post(
-        OPTIMIZER_RUN_URL,
+        f"{OPTIMIZER_RUN_URL}?horizon_days=30",
         json={
             "target_date": target_date.isoformat(),
             "section_ids": [setup["section_id"]],
-            "horizon_days": 30,
             "persist_to_db": False,
         },
     )
     assert run_30d.status_code == 200
-    assert run_30d.json()["solver_status"] in ("OPTIMAL", "FEASIBLE")
+    data_30d = run_30d.json()
+    assert data_30d["solver_status"] in ("OPTIMAL", "FEASIBLE")
+    assert data_30d["total_blocks_scheduled"] >= 1
+    assert data_30d["solver_execution_time_ms"] >= 0.0
+
+
+@pytest.mark.asyncio
+async def test_optimizer_horizon_days_validation_errors(client: AsyncClient):
+    """Verify HTTP 422 Unprocessable Entity when horizon_days < 1 or > 30."""
+    target_date = date(2026, 8, 25)
+    setup = await _setup_test_corridor(client, target_date)
+
+    # 1. horizon_days = 0 in query param -> 422
+    resp_q_0 = await client.post(
+        f"{OPTIMIZER_RUN_URL}?horizon_days=0",
+        json={
+            "target_date": target_date.isoformat(),
+            "section_ids": [setup["section_id"]],
+            "persist_to_db": False,
+        },
+    )
+    assert resp_q_0.status_code == 422
+
+    # 2. horizon_days = 31 in query param -> 422
+    resp_q_31 = await client.post(
+        f"{OPTIMIZER_RUN_URL}?horizon_days=31",
+        json={
+            "target_date": target_date.isoformat(),
+            "section_ids": [setup["section_id"]],
+            "persist_to_db": False,
+        },
+    )
+    assert resp_q_31.status_code == 422
+
+    # 3. horizon_days = 0 in body -> 422
+    resp_b_0 = await client.post(
+        OPTIMIZER_RUN_URL,
+        json={
+            "target_date": target_date.isoformat(),
+            "section_ids": [setup["section_id"]],
+            "horizon_days": 0,
+            "persist_to_db": False,
+        },
+    )
+    assert resp_b_0.status_code == 422
+
+    # 4. horizon_days = 31 in body -> 422
+    resp_b_31 = await client.post(
+        OPTIMIZER_RUN_URL,
+        json={
+            "target_date": target_date.isoformat(),
+            "section_ids": [setup["section_id"]],
+            "horizon_days": 31,
+            "persist_to_db": False,
+        },
+    )
+    assert resp_b_31.status_code == 422
+
 
 

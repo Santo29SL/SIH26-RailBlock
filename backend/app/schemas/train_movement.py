@@ -17,6 +17,10 @@ class TrainMovementBase(BaseModel):
     departure_time: time
     arrival_time: time
     day_of_week: int = Field(..., ge=0, le=6, description="0=Monday, 6=Sunday")
+    movement_type: str = Field(
+        default="SCHEDULED",
+        description="Type of train movement: SCHEDULED (timetable) or FORECAST_FREIGHT (Control Office goods forecast)",
+    )
     is_active: bool = Field(default=True)
 
 
@@ -32,6 +36,7 @@ class TrainMovementUpdate(BaseModel):
     departure_time: Optional[time] = None
     arrival_time: Optional[time] = None
     day_of_week: Optional[int] = Field(None, ge=0, le=6)
+    movement_type: Optional[str] = None
     is_active: Optional[bool] = None
 
 

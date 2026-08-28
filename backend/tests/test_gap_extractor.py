@@ -54,6 +54,7 @@ class MockTrainMovement:
     departure_time: time
     arrival_time: time
     day_of_week: int  # 0=Monday, 6=Sunday
+    movement_type: str = "SCHEDULED"
     is_active: bool = True
     train: Optional[MockTrain] = None
     line_direction: Optional[str] = None
@@ -68,6 +69,7 @@ def make_movement(
     train_name: str = "Grand Trunk Express",
     train_type: TrainTypeEnum = TrainTypeEnum.EXPRESS,
     priority: TrainPriorityEnum = TrainPriorityEnum.MEDIUM,
+    movement_type: str = "SCHEDULED",
     is_active: bool = True,
     line_direction: Optional[str] = None,
 ) -> MockTrainMovement:
@@ -88,6 +90,7 @@ def make_movement(
         departure_time=dep,
         arrival_time=arr,
         day_of_week=day_of_week,
+        movement_type=movement_type,
         is_active=is_active,
         train=train,
         line_direction=line_direction,
@@ -529,3 +532,51 @@ def test_corridor_gap_helpers():
     assert gap.contains_window(time(2, 0), time(3, 30)) is True
     assert gap.contains_window(time(1, 0), time(3, 0)) is False  # Starts too early
     assert gap.contains_window(time(3, 0), time(5, 0)) is False  # Ends too late
+
+
+def test_forecast_freight_reduces_corridor_gaps():
+    """Verify that FORECAST_FREIGHT movements are recognized as corridor occupancy and reduce the available gap window."""
+    sec_id = uuid.uuid4()
+    target_date = date(2026, 8, 25)  # Tuesday (weekday 1)
+
+    # 1. Baseline with only 1 scheduled train in morning: 08:00 - 08:30
+    # Available afternoon gap: 08:45 to 24:00 (915 min)
+    scheduled_mov = make_movement(
+        section_id=sec_id,
+        dep=time(8, 0),
+        arr=time(8, 30),
+        day_of_week=1,
+        train_number="12621",
+        movement_type="SCHEDULED",
+    )
+    baseline_gaps = extract_corridor_gaps(
+        movements=[scheduled_mov],
+        target_date=target_date,
+        section_id=sec_id,
+    )
+    total_baseline_duration = sum(g.duration_minutes for g in baseline_gaps)
+
+    # 2. Add a FORECAST_FREIGHT movement occupying afternoon path: 14:00 - 15:30
+    forecast_freight_mov = make_movement(
+        section_id=sec_id,
+        dep=time(14, 0),
+        arr=time(15, 30),
+        day_of_week=1,
+        train_number="FRT-001",
+        train_name="Anticipated Goods Rake (BOXN)",
+        train_type=TrainTypeEnum.FREIGHT,
+        priority=TrainPriorityEnum.LOW,
+        movement_type="FORECAST_FREIGHT",
+    )
+    forecast_gaps = extract_corridor_gaps(
+        movements=[scheduled_mov, forecast_freight_mov],
+        target_date=target_date,
+        section_id=sec_id,
+    )
+    total_forecast_duration = sum(g.duration_minutes for g in forecast_gaps)
+
+    # The forecast freight movement must occupy corridor capacity, reducing total gap minutes
+    assert total_forecast_duration < total_baseline_duration
+    # Specifically, gap splits around 14:00 - 15:30 + buffers (13:45 to 15:45 = 120 min occupied)
+    assert len(forecast_gaps) > len(baseline_gaps)
+

@@ -592,11 +592,56 @@ def process_data(
                     "departure_time": dep_time,
                     "arrival_time": arr_time,
                     "day_of_week": actual_day,
+                    "movement_type": "SCHEDULED",
                     "is_active": True,
                 })
 
+    # ── Forecast Freight Movements (Control Office Goods Trains Forecast) ──
+    # Generate >= 40 forecast freight train movements across freight sections
+    forecast_freight_trains = [
+        {
+            "train_number": f"FRT-{i:03d}",
+            "train_name": f"Anticipated Goods Rake {i:02d} (BOXN Freight)",
+            "train_type": "FREIGHT",
+            "priority": "LOW",
+        }
+        for i in range(1, 11)
+    ]
+    forecast_mov_count = 0
+    for ft in forecast_freight_trains:
+        ft_id = uuid.uuid4()
+        db_trains.append({
+            "id": ft_id,
+            "train_number": ft["train_number"],
+            "train_name": ft["train_name"],
+            "train_type": ft["train_type"],
+            "priority": ft["priority"],
+        })
+        # Generate 5 movements per freight rake across sections and days (50 total >= 40)
+        for d in range(5):
+            sec = random.choice(db_sections)
+            dep_h = (d * 4 + 2) % 24
+            dep_m = random.choice([0, 15, 30, 45])
+            dur = random.randint(45, 90)
+            dep_t = time(dep_h, dep_m)
+            arr_dt = datetime.combine(date.today(), dep_t) + timedelta(minutes=dur)
+            arr_t = arr_dt.time()
+            day_dow = (d * 2) % 7
+
+            db_movements.append({
+                "id": uuid.uuid4(),
+                "train_id": ft_id,
+                "section_id": sec["id"],
+                "departure_time": dep_t,
+                "arrival_time": arr_t,
+                "day_of_week": day_dow,
+                "movement_type": "FORECAST_FREIGHT",
+                "is_active": True,
+            })
+            forecast_mov_count += 1
+
     print(f"📊 Built {len(db_sections)} sections, {len(db_trains)} trains, "
-          f"{len(db_movements)} movements")
+          f"{len(db_movements)} movements ({forecast_mov_count} FORECAST_FREIGHT)")
 
     return db_sections, db_trains, db_movements
 

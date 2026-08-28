@@ -186,7 +186,7 @@ All endpoints are hosted under prefix `/api/v1`:
 | | `GET` | `/api/v1/blocks/{id}/export-bdms`| Export CRIS BDMS JSON draft block format | Controller |
 | | `GET` | `/api/v1/blocks/{id}/t351-notice`| Export Form T/351 Disconnection Notice payload | Station Master |
 | | `GET` | `/api/v1/blocks/{id}/td602-sheet`| Export Form T/D 602 SLW authority & caution order support sheet | Station Master / Controller |
-| **Optimizer** | `POST` | `/api/v1/optimizer/run` | Execute Stages 3 $\to$ 4 $\to$ 5 solver & persist | Controller |
+| **Optimizer** | `POST` | `/api/v1/optimizer/run?horizon_days=7|30` | Execute Stages 3 $\to$ 4 $\to$ 5 solver over the requested horizon (7 = weekly plan, 30 = monthly plan) & persist | Controller |
 | | `POST` | `/api/v1/optimizer/simulate` | In-memory What-If simulation with HMAC token | Controller |
 | | `POST` | `/api/v1/optimizer/commit-simulation`| Commit simulated schedule using HMAC token | Controller |
 | | `POST` | `/api/v1/optimizer/reschedule`| Real-time fast rescheduling & SLW fallback | Controller |

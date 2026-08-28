@@ -17,7 +17,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -192,6 +192,12 @@ def _verify_commit_token(token: str, secret_key: str) -> Dict[str, Any]:
 )
 async def run_optimizer(
     request: OptimizerRunRequest,
+    horizon_days: Optional[int] = Query(
+        None,
+        ge=1,
+        le=30,
+        description="Planning horizon in days (7 for weekly, 30 for monthly). Overrides body if provided.",
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> OptimizerRunResponse:
     """Execute Stage 3 -> Stage 4 -> Stage 5 block optimizer pipeline.
@@ -200,6 +206,8 @@ async def run_optimizer(
     resources, and compatibility rules from the database, runs Google OR-Tools
     MILP solver, and optionally persists scheduled Block and BlockJob records.
     """
+    effective_horizon = horizon_days if horizon_days is not None else request.horizon_days
+
     # 1. Fetch sections
     section_query = select(Section)
     if request.section_ids:
@@ -210,14 +218,13 @@ async def run_optimizer(
     target_section_ids = [s.id for s in sections]
     section_code_map = {s.id: s.section_code for s in sections}
 
-    # 2. Fetch train movements on target sections for the planning day
+    # 2. Fetch train movements on target sections for the planning horizon
     movement_query = (
         select(TrainMovement)
         .options(selectinload(TrainMovement.train))
         .where(
             TrainMovement.section_id.in_(target_section_ids),
             TrainMovement.is_active == True,
-            TrainMovement.day_of_week == request.target_date.weekday(),
         )
     )
     mov_result = await db.execute(movement_query)
@@ -255,7 +262,7 @@ async def run_optimizer(
         alpha_shadow=request.alpha_shadow_weight,
         beta_detention=request.beta_detention_weight,
         max_solver_time_seconds=request.solver_timeout_seconds,
-        horizon_days=request.horizon_days,
+        horizon_days=effective_horizon,
     )
 
     # 6. Optionally persist to PostgreSQL
