@@ -68,7 +68,6 @@ flowchart TD
         T351["Form T/351 Disconnection Portal<br/><i>Station Master Private Numbers (PN)</i>"]
         TD602["Form T/D 602 Authority Sheet<br/><i>Line Clear Ticket & Caution Order</i>"]
         BDMS["CRIS BDMS Exporter<br/><i>Official Draft Possession Requests</i>"]
-        T351 & TD602 & BDMS
     end
 
     TMS & SMMS & TDMS --> STAGE2
@@ -83,13 +82,13 @@ flowchart TD
 
 ## ⚡ Stage-by-Stage Functional Breakdown
 
-* **Stage 1 — Multi-System Data Ingestion & Adapters:** Ingests maintenance defect requisitions from **TMS** (Civil Track), **SMMS** (Signal & Telecom), **TDMS** (Traction Distribution/Electrical), and train movements from **COA**. Edge adapters (`adapters.py`) normalize incoming requisitions into uniform `MaintenanceRequest` domain objects supporting standard IRPWM USFD classifications (`GOOD`, `IMR`, `IMRW`, `OBS`, `OBSW`) and Track Geometry Curvature.
+* **Stage 1 — Multi-System Data Ingestion & Adapters:** Ingests maintenance defect requisitions from **TMS** (Civil Track), **SMMS** (Signal & Telecom), **TDMS** (Traction Distribution/Electrical), and train movements & goods trains forecast from **COA**. Edge adapters (`adapters.py`) normalize incoming requisitions into uniform `MaintenanceRequest` domain objects supporting standard IRPWM USFD classifications (`GOOD`, `IMR`, `IMRW`, `OBS`, `OBSW`) and Track Geometry Curvature.
 * **Stage 2 — AI Risk & Criticality Scoring Engine:** Predicts a dynamic **Criticality Index ($CI \in [0, 100]$)** using a **Two-Mode Scoring Architecture**:
   * **Primary Deployed Model (Mode 2):** Monotone-constrained Gradient Boosted Trees (`XGBoost` / `LightGBM`) trained on simulated 30-day failure hazard outcomes with domain randomization and feature interactions, post-hoc isotonic-calibrated, and served with probability-space **SHAP** attributions.
-  * **Deterministic Fallback & Baseline (Mode 1):** A transparent expert-weighted linear formula used when model artifacts are absent and as the comparative baseline in evaluation.
-* **Stage 3 — Corridor Gap & Headway Extractor:** Analyzes COA timetables to identify unoccupied track windows ($\ge 60\text{ min}$) with statutory **$\ge 15\text{ min}$ safety headways** before and after train movements, stitching gaps across midnight rolling boundaries.
+  * **Deterministic Fallback & Baseline (Mode 1):** A transparent expert-weighted linear formula used when model artifacts are absent and as the comparative baseline in evaluation. Incorporates the statutory **Availability-Impact Dimension** ($\text{MPS} - v_{\text{TSR}}$).
+* **Stage 3 — Corridor Gap & Headway Extractor:** Analyzes COA timetables and goods trains forecast (`FORECAST_FREIGHT`) to identify unoccupied track windows ($\ge 60\text{ min}$) with statutory **$\ge 15\text{ min}$ safety headways** before and after train movements, stitching gaps across midnight rolling boundaries.
 * **Stage 4 — Joint Shadow Block Clustering:** Bundles compatible multi-department maintenance tasks occurring within $\le 10\text{ km}$ spatial bounds and Substation Feeding Post (FP) / Sectioning Post (SP) electrical power zones ($40\text{--}80\text{ km}$), strictly enforcing the **G&SR Statutory Safety Conflict Matrix**.
-* **Stage 5 — Google OR-Tools CP-SAT Optimization Solver:** Formulates a Space-Time constraint programming model supporting multi-horizon planning (24h tactical, 7-day weekly, 30-day master). Enforces **hard zero-detention constraints for Tier 1 VIP trains (Rajdhani, Vande Bharat, Shatabdi)** while optimizing block placement and heavy machine fleet capacity limits.
+* **Stage 5 — Google OR-Tools CP-SAT Optimization Solver:** Formulates a Space-Time constraint programming model supporting multi-horizon planning (24h tactical, 7-day weekly, 30-day master via `horizon_days=7|30`). Enforces **hard zero-detention constraints for Tier 1 VIP trains (Rajdhani, Vande Bharat, Shatabdi)** while optimizing block placement and heavy machine fleet capacity limits.
 * **Stage 6 — Real-Time Fast Rescheduler & Emergency Protocol:** Triggers sub-millisecond greedy time-shifting when live train delays exceed $20\text{ minutes}$. Automatically generates **Temporary Single Line Working (TSLW)** advisories per **GR 3.68 & zonal SR Chapters 4/15** with **Form T/D 602** support sheets and Section Controller control-phone scripts.
 * **Stage 7 — Statutory Form T/351, Form T/D 602 & CRIS BDMS Exporters:** Enforces digital Station Master **Private Number (PN)** exchanges for track disconnections/reconnections, exports Form T/D 602 TSLW authority sheets, and exports draft possession requests directly in official **CRIS BDMS JSON format**.
 
@@ -102,7 +101,7 @@ flowchart TD
 | Feature Name | Type | Range | Department | Domain Description |
 | :--- | :---: | :---: | :---: | :--- |
 | **`tgi_deviation`** | `float` | `0.0` -- `100.0` | Track (TMS) | Deviation from standard Track Geometry Index ($100 - \text{TGI}$) across Gauge, Cross-Level, Twist, Longitudinal Level, Alignment, and Curvature. |
-| **`speed_restriction_kmh`**| `float` | `0.0` -- `120.0` | All | Speed drop delta ($\text{MPS} - v_{\text{TSR}}$). |
+| **`speed_restriction_kmh`**| `float` | `0.0` -- `120.0` | All | Speed drop delta ($\text{MPS} - v_{\text{TSR}}$), measuring impact on asset availability. |
 | **`days_overdue`** | `float` | `0.0` -- `60.0` | All | Days elapsed past statutory maintenance deadline. |
 | **`section_gmt_density`** | `float` | `5.0` -- `150.0` | All | Annual Gross Million Tonnes carried by section (traffic density). |
 | **`department_code`** | `str` / `int` | `TRACK`, `SIGNAL`, `TRACTION` | All | Department identifier. |
@@ -153,7 +152,7 @@ SIH26-RailBlock/
 │   │   ├── ml_models/
 │   │   │   └── criticality_v1/  # Production ML artifact bundle (model.json, calibrator, schema, enums, ci_map, background, model_card)
 │   │   └── seed_all.py          # Database seeder script
-│   ├── tests/                   # Automated pytest suite (116 passing tests)
+│   ├── tests/                   # Automated pytest suite (118 passing tests)
 │   ├── Dockerfile               # Multi-stage production container configuration
 │   ├── entrypoint.sh            # Auto-migration + seed + server startup script
 │   └── requirements.txt         # Production backend dependencies
@@ -234,14 +233,14 @@ This automatically:
 | `/api/v1/sections` | `GET` | Retrieve list of railway sections with station markers |
 | `/api/v1/train-movements` | `GET` | List timetabled train movements on a specific section |
 | `/api/v1/maintenance` | `GET` | List pending maintenance requests across Track, Signal, and Traction |
-| `/api/v1/optimizer/run` | `POST` | Execute Stage 3 $\to$ 4 $\to$ 5 solver across 24h, 7-day, or 30-day horizons |
+| `/api/v1/optimizer/run?horizon_days=7\|30` | `POST` | Execute Stage 3 $\to$ 4 $\to$ 5 solver across 24h, 7-day (weekly), or 30-day (monthly) horizons |
 | `/api/v1/optimizer/simulate` | `POST` | Pure in-memory What-If scenario simulation with HMAC commit token |
 | `/api/v1/optimizer/commit-simulation` | `POST` | Commit simulated schedule to DB using verified HMAC token |
 | `/api/v1/blocks/{id}/transition` | `POST` | Form T/351 Private Number exchange state machine transition |
 | `/api/v1/blocks/{id}/export-bdms` | `GET` | Export approved block in official CRIS BDMS draft JSON format |
 | `/api/v1/blocks/{id}/t351-notice` | `GET` | Export statutory Form T/351 Disconnection Notice payload |
 | `/api/v1/blocks/{id}/td602-sheet` | `GET` | Export statutory Form T/D 602 TSLW line clear authority and caution order support sheet |
-| `/api/v1/risk/predict` | `POST` | Predict failure probability, Criticality Index ($CI \in [0, 100]$), and SHAP attribution |
+| `/api/v1/risk/predict` | `POST` | Predict failure probability, Criticality Index ($CI \in [0, 100]$), and probability-space SHAP attribution |
 | `/api/v1/risk/model-info` | `GET` | Retrieve active model card metadata, training parameters, bounds, and SHA-256 digest |
 | `/api/v1/events/ws/telemetry` | `WS` | WebSocket live train delay & SLW broadcast stream |
 
@@ -257,7 +256,7 @@ uv run pytest ml/tests/ -v
 # 2. Run Backend tests (auth, optimizer, clustering, rescheduler, ingestion, blocks)
 cd backend && uv run pytest -v
 ```
-**Total:** **125 / 125 tests passing (100% success)**.
+**Total:** **127 / 127 tests passing (100% success)** (118 Backend + 9 ML).
 
 ---
 
