@@ -7,10 +7,20 @@ __pycache__/
 venv/
 .venv
 .venv/
-env/
+# Environment & Secrets
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*.pfx
+*.pkcs12
+*.crt
+*.cert
+credentials.json
+client_secrets*.json
+id_rsa*
+id_ed25519*
 
 # IDE & Editor
 .vscode/
