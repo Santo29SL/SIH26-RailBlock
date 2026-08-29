@@ -1,4 +1,4 @@
-"""Unit and integration tests for Google OR-Tools MILP block optimizer engine.
+"""Unit and integration tests for Google OR-Tools CP-SAT block optimizer engine.
 
 Stage 5 Test Suite for RailBlock (SIH PS 26027).
 

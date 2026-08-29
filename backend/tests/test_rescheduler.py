@@ -2,11 +2,11 @@
 
 Tests all acceptance criteria for Ticket 05:
 1. `reschedule_on_disruption()` signature, inputs, and `RescheduleOutcome` frozen dataclass output.
-2. Fast greedy time-shifting (<1 second) for train delays >20 minutes without global MILP re-solving.
+2. Fast greedy time-shifting (<1 second) for train delays >20 minutes without global CP-SAT re-solving.
 3. Internal shadow activity offset and duration preservation during time shifts.
 4. Statutory safety buffer absorption (<=20 minute delays) without window shifts.
 5. G&SR Chapter 5/15 Single Line Working (SLW) emergency advisory generation for block overruns (+15 min) with queued trains.
-6. Statutory SLW advisory structure (pilot train dispatch, speed limits 25/15/45 km/h, freight siding holding orders, SM Private Number).
+6. Statutory SLW advisory structure (pilot train dispatch, speed limits 25/15/40 km/h, freight siding regulation, SM Private Number).
 7. Block overrun without queued trains (overrun warning).
 8. Single line track topology (section blockade).
 9. Polymorphic input compatibility: ScheduledBlock, ScheduledBlockSummary, and raw dictionaries.
@@ -52,7 +52,9 @@ from app.services.rescheduler import (
     ScheduledBlockPlan,
     apply_greedy_time_shift,
     format_slw_advisory_text,
+    generate_controller_phone_script,
     generate_slw_advisory,
+    generate_td602_authority_sheet,
     reschedule_on_disruption,
 )
 
@@ -178,7 +180,7 @@ def test_type_alias_compatibility():
 
 
 def test_reschedule_delay_over_20_minutes(sample_scheduled_block: ScheduledBlock):
-    """AC: For train delays > 20 minutes, shift block start/end times in <1 second without global MILP re-solve."""
+    """AC: For train delays > 20 minutes, shift block start/end times in <1 second without global CP-SAT re-solve."""
     t0 = _time.perf_counter()
     outcome = reschedule_on_disruption(
         active_block=sample_scheduled_block,
@@ -315,7 +317,7 @@ def test_reschedule_block_overrun_with_queued_trains_triggers_slw(
     # AC: Verify statutory speed limits under G&SR
     assert slw.first_pilot_speed_kmph == SLW_FIRST_PILOT_MAX_SPEED_KMPH == 25
     assert slw.facing_points_speed_kmph == SLW_FACING_POINTS_MAX_SPEED_KMPH == 15
-    assert slw.subsequent_train_speed_kmph == SLW_SUBSEQUENT_MAX_SPEED_KMPH == 45
+    assert slw.subsequent_train_speed_kmph == SLW_SUBSEQUENT_MAX_SPEED_KMPH == 40
 
     # AC: Verify freight siding holding orders
     assert len(slw.freight_siding_orders) == 2
@@ -325,13 +327,13 @@ def test_reschedule_block_overrun_with_queued_trains_triggers_slw(
     # AC: Verify pre-formatted advisory text
     adv_text = slw.advisory_text
     assert "INDIAN RAILWAYS - OPERATIONAL SAFETY ADVISORY" in adv_text
-    assert "G&SR CH 5 & CH 15" in adv_text
+    assert "GR 3.68" in adv_text
     assert "SINGLE LINE WORKING (SLW) EMERGENCY AUTHORIZATION NOTICE" in adv_text
     assert "MAS-AJJ (Chennai Central - Arakkonam)" in adv_text
     assert "PN-8421" in adv_text
     assert "25 km/h" in adv_text
     assert "15 km/h" in adv_text
-    assert "45 km/h" in adv_text
+    assert "40 km/h" in adv_text
     assert "BOXN-7741" in adv_text
     assert "Form T/351-B" in adv_text
 
@@ -547,3 +549,39 @@ def test_performance_sub_millisecond_benchmark(sample_scheduled_block: Scheduled
 
     assert t_total < 0.5  # 1000 runs in under 500ms
     assert avg_ms < 0.5   # Under 0.5ms per reschedule
+
+
+def test_td602_authority_sheet_and_phone_script_generation():
+    """Verify structured Form T/D 602 Authority sheet and Section Controller phone script."""
+    ts = datetime(2026, 8, 25, 12, 30, 0)
+    sheet = generate_td602_authority_sheet(
+        section_code="MAS-AJJ",
+        section_name="Chennai Central - Arakkonam",
+        obstructed_line="UP Main Line",
+        single_line_in_use="DOWN Main Line",
+        pilot_train_number="12621",
+        private_number="PN-9988",
+        timestamp=ts,
+        division="Chennai",
+        zone="Southern Railway",
+    )
+
+    assert sheet["form_name"] == "Form T/D 602"
+    assert sheet["statutory_rule"] == "GR 3.68, SR 4.42, SR 4.09 & SR Chapter 15"
+    assert sheet["section_code"] == "MAS-AJJ"
+    assert sheet["pilot_train_number"] == "12621"
+    assert sheet["station_master_private_number"] == "PN-9988"
+    assert sheet["part_3_caution_order"]["pilot_train_speed"] == "25 km/h (Day/Night pilot speed ceiling)"
+    assert sheet["part_3_caution_order"]["facing_points_speed"] == "15 km/h over all facing points and crossovers"
+
+    script = generate_controller_phone_script(
+        section_code="MAS-AJJ",
+        obstructed_line="UP Main Line",
+        single_line_in_use="DOWN Main Line",
+        pilot_train_number="12621",
+        private_number="PN-9988",
+    )
+    assert "[CONTROL PHONE SCRIPT - SECTION CONTROLLER TO ALL STATIONS MAS-AJJ]" in script
+    assert "First Pilot Train is 12621" in script
+    assert "PN-9988" in script
+

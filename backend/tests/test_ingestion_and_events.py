@@ -65,3 +65,33 @@ async def test_ingest_tms_smms_tdms(client: AsyncClient, db_session):
     )
     assert tdms_res.status_code == 201
     assert tdms_res.json()["department"] == "TRACTION"
+
+    # 4. TMS Track Ingestion with statutory IRPWM USFD Classification & Curvature
+    tms_imrw = await client.post(
+        "/api/v1/ingest/tms",
+        json={
+            "section_id": str(section.id),
+            "usfd_classification": "IMRW",
+            "tgi_deviation": 90.0,
+            "chainage_km": 142.5,
+            "curvature_deg": 3.5,
+            "duration_minutes": 180,
+        },
+    )
+    assert tms_imrw.status_code == 201
+    assert tms_imrw.json()["priority"] == "CRITICAL"
+    assert tms_imrw.json()["department"] == "TRACK"
+
+    tms_obs = await client.post(
+        "/api/v1/ingest/tms",
+        json={
+            "section_id": str(section.id),
+            "usfd_classification": "OBS",
+            "tgi_deviation": 75.0,
+            "chainage_km": 150.0,
+            "curvature_deg": 1.0,
+            "duration_minutes": 120,
+        },
+    )
+    assert tms_obs.status_code == 201
+    assert tms_obs.json()["priority"] == "MEDIUM"

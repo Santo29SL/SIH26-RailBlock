@@ -1,0 +1,12 @@
+# ML Workspace Requirements — RailBlock Stage 2 AI Risk Scoring Engine
+xgboost>=2.0.0
+lightgbm>=4.0.0
+catboost>=1.2.0
+shap>=0.43.0
+optuna>=3.4.0
+scikit-learn>=1.3.0
+pandas>=2.0.0
+numpy>=1.24.0
+joblib>=1.3.0
+matplotlib>=3.7.0
+seaborn>=0.12.0

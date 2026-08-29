@@ -14,12 +14,17 @@ from app.core.database import Base
 
 
 class UserRole(str, enum.Enum):
-    """User roles for RailBlock authorization."""
+    """User roles for RailBlock authorization (4+1 Tier RBAC)."""
 
     ADMIN = "ADMIN"
     SECTION_CONTROLLER = "SECTION_CONTROLLER"
     STATION_MASTER = "STATION_MASTER"
     DEPARTMENT_ENGINEER = "DEPARTMENT_ENGINEER"
+    DIVISIONAL_AUTHORITY = "DIVISIONAL_AUTHORITY"
+    """Approval of traffic blocks > 4 hours and NI works > 3 days, per Railway Board letter dated 16.06.2022 (DRM ≤ 4 hr; GM sanction for NI ≤ 3 days)."""
+
+
+RoleEnum = UserRole
 
 
 class User(Base):

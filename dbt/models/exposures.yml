@@ -1,0 +1,37 @@
+version: 2
+
+exposures:
+  - name: control_office_dashboard
+    type: dashboard
+    maturity: high
+    url: http://localhost:5173
+    description: "Real-time Control Office Application (COA) React Single-Page Dashboard with Gantt timeline and Leaflet GIS map"
+    depends_on:
+      - ref('fct_scheduled_blocks')
+      - ref('fct_corridor_gaps')
+      - ref('fct_ai_criticality_scores')
+      - ref('dim_railway_sections')
+    owner:
+      name: "Chief Controller (CPRC)"
+      email: "cprc@railblock.gov.in"
+
+  - name: statutory_form_t351_portal
+    type: application
+    maturity: high
+    description: "Statutory Indian Railways Form T/351 Disconnection Notice & Form T/D 602 Authority generator"
+    depends_on:
+      - ref('fct_scheduled_blocks')
+    owner:
+      name: "Station Master & SSE P.Way"
+      email: "sm.mas@railblock.gov.in"
+
+  - name: mlops_hazard_retraining
+    type: ml
+    maturity: high
+    description: "Weekly Airflow DAG for CatBoost/XGBoost Monotone Hazard Retraining and SHA-256 verification"
+    depends_on:
+      - ref('fct_ai_criticality_scores')
+      - ref('int_consolidated_defects')
+    owner:
+      name: "ML Risk Engineering Team"
+      email: "ml@railblock.gov.in"

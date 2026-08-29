@@ -74,3 +74,29 @@ async def test_unauthenticated_profile_access(client: AsyncClient):
     """Test accessing protected profile endpoint without token returns 401."""
     res = await client.get("/api/v1/auth/me")
     assert res.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_divisional_authority_login(client: AsyncClient):
+    """Test seeding and logging in as DIVISIONAL_AUTHORITY (drm_mas)."""
+    await client.post("/api/v1/auth/seed-users")
+    login_data = {
+        "username": "drm_mas",
+        "password": "Password123!",
+    }
+    login_res = await client.post("/api/v1/auth/login", data=login_data)
+    assert login_res.status_code == 200
+
+    token_payload = login_res.json()
+    assert token_payload["role"] == "DIVISIONAL_AUTHORITY"
+    assert token_payload["username"] == "drm_mas"
+
+    token = token_payload["access_token"]
+    me_res = await client.get(
+        "/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert me_res.status_code == 200
+    profile = me_res.json()
+    assert profile["username"] == "drm_mas"
+    assert profile["role"] == "DIVISIONAL_AUTHORITY"
+    assert profile["department"] == "OPERATIONS"
