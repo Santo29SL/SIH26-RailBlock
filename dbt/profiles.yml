@@ -1,0 +1,13 @@
+railblock:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: localhost
+      port: 5433
+      user: postgres
+      pass: postgres
+      dbname: railblock
+      schema: public
+      threads: 4
+      keepalives_idle: 0

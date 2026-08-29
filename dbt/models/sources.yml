@@ -1,0 +1,16 @@
+version: 2
+
+sources:
+  - name: cris_sources
+    database: railblock
+    schema: public
+    description: "Raw operational and maintenance feeds from Indian Railways legacy databases"
+    tables:
+      - name: maintenance_requests
+        description: "Raw defect logs from TMS (Track), SMMS (Signals), and TDMS (Traction)"
+      - name: train_movements
+        description: "Raw passenger timetables and freight forecast slots from COA"
+      - name: sections
+        description: "Raw physical track sections and traction substation feeding post (FP/SP) definitions"
+      - name: resources
+        description: "Raw heavy track machines and crew depot allocation registers"
