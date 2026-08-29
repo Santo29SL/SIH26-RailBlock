@@ -71,7 +71,7 @@ services:
     command:
       - bash
       - -c
-      - "pip install --no-cache-dir dbt-postgres && dbt docs serve --port 8085 --project-dir dbt --profiles-dir dbt"
+      - "pip install --no-cache-dir dbt-postgres && dbt docs serve --host 0.0.0.0 --port 8085 --no-browser --project-dir dbt --profiles-dir dbt"
     ports:
       - "8085:8085"
     depends_on:
