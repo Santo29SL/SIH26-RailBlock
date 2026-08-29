@@ -91,53 +91,56 @@ export const RiskInspector: React.FC<RiskInspectorProps> = ({ defects }) => {
                   </tr>
 
                   {/* Expandable SHAP Explainability Row */}
-                  {isExpanded && (
-                    <tr>
-                      <td colSpan={9} style={{ background: '#f8fafc', padding: '12px 16px', borderBottom: '2px solid #003366' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px' }}>
-                          
-                          {/* Controller Reasoning */}
-                          <div>
-                            <div style={{ fontWeight: 700, color: '#003366', fontSize: '11px', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <HelpCircle size={12} color="#003366" />
-                              SECTION CONTROLLER NATURAL LANGUAGE REASONING (PROBABILITY-SPACE SHAP)
+                  {isExpanded && (() => {
+                    const meta = def.metadata || (def as any).metadata_json || {};
+                    return (
+                      <tr>
+                        <td colSpan={9} style={{ background: '#f8fafc', padding: '12px 16px', borderBottom: '2px solid #003366' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px' }}>
+                            
+                            {/* Controller Reasoning */}
+                            <div>
+                              <div style={{ fontWeight: 700, color: '#003366', fontSize: '11px', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <HelpCircle size={12} color="#003366" />
+                                SECTION CONTROLLER NATURAL LANGUAGE REASONING (PROBABILITY-SPACE SHAP)
+                              </div>
+                              <div style={{ background: '#ffffff', border: '1px solid #d0d7de', padding: '8px', fontSize: '11px', lineHeight: 1.5 }}>
+                                {def.shap_reasoning || 'Calibrated model evaluated condition metrics against 50 latent railway section regimes.'}
+                              </div>
                             </div>
-                            <div style={{ background: '#ffffff', border: '1px solid #d0d7de', padding: '8px', fontSize: '11px', lineHeight: 1.5 }}>
-                              {def.shap_reasoning || 'Calibrated model evaluated condition metrics against 50 latent railway section regimes.'}
-                            </div>
-                          </div>
 
-                          {/* Raw Feature Values */}
-                          <div>
-                            <div style={{ fontWeight: 700, color: '#003366', fontSize: '11px', marginBottom: '4px' }}>
-                              STATUTORY ASSET CONDITION METRICS
+                            {/* Raw Feature Values */}
+                            <div>
+                              <div style={{ fontWeight: 700, color: '#003366', fontSize: '11px', marginBottom: '4px' }}>
+                                STATUTORY ASSET CONDITION METRICS
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', fontSize: '11px' }}>
+                                {meta.tgi_deviation !== undefined && (
+                                  <div>TGI Deviation: <strong>{meta.tgi_deviation}/100</strong></div>
+                                )}
+                                {meta.speed_restriction_kmh !== undefined && (
+                                  <div>TSR Speed Drop: <strong>{meta.speed_restriction_kmh} km/h</strong></div>
+                                )}
+                                {meta.usfd_flaw_severity !== undefined && (
+                                  <div>USFD Flaw: <strong style={{ color: '#c62828' }}>{meta.usfd_flaw_severity}</strong></div>
+                                )}
+                                {meta.point_failure_risk !== undefined && (
+                                  <div>Point Jam Risk: <strong>{meta.point_failure_risk}%</strong></div>
+                                )}
+                                {meta.ohe_insulator_wear !== undefined && (
+                                  <div>OHE Wear: <strong>{meta.ohe_insulator_wear}%</strong></div>
+                                )}
+                                {meta.section_gmt_density !== undefined && (
+                                  <div>Traffic GMT: <strong>{meta.section_gmt_density} GMT</strong></div>
+                                )}
+                              </div>
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', fontSize: '11px' }}>
-                              {def.metadata.tgi_deviation !== undefined && (
-                                <div>TGI Deviation: <strong>{def.metadata.tgi_deviation}/100</strong></div>
-                              )}
-                              {def.metadata.speed_restriction_kmh !== undefined && (
-                                <div>TSR Speed Drop: <strong>{def.metadata.speed_restriction_kmh} km/h</strong></div>
-                              )}
-                              {def.metadata.usfd_flaw_severity !== undefined && (
-                                <div>USFD Flaw: <strong style={{ color: '#c62828' }}>{def.metadata.usfd_flaw_severity}</strong></div>
-                              )}
-                              {def.metadata.point_failure_risk !== undefined && (
-                                <div>Point Jam Risk: <strong>{def.metadata.point_failure_risk}%</strong></div>
-                              )}
-                              {def.metadata.ohe_insulator_wear !== undefined && (
-                                <div>OHE Wear: <strong>{def.metadata.ohe_insulator_wear}%</strong></div>
-                              )}
-                              {def.metadata.section_gmt_density !== undefined && (
-                                <div>Traffic GMT: <strong>{def.metadata.section_gmt_density} GMT</strong></div>
-                              )}
-                            </div>
-                          </div>
 
-                        </div>
-                      </td>
-                    </tr>
-                  )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })()}
                 </React.Fragment>
               );
             })}

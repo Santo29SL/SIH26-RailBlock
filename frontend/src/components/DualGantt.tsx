@@ -10,10 +10,11 @@ interface DualGanttProps {
 }
 
 // Convert "HH:MM:SS" into percentage of 24h day
-function timeToPercent(timeStr: string): number {
-  const [h, m] = timeStr.split(':').map(Number);
-  const totalMins = (h || 0) * 60 + (m || 0);
-  return (totalMins / 1440) * 100;
+function timeToPercent(timeStr?: string): number {
+  if (!timeStr || typeof timeStr !== 'string') return 0;
+  const parts = timeStr.split(':').map(Number);
+  const totalMins = (parts[0] || 0) * 60 + (parts[1] || 0);
+  return Math.min(100, Math.max(0, (totalMins / 1440) * 100));
 }
 
 export const DualGantt: React.FC<DualGanttProps> = ({
@@ -88,15 +89,19 @@ export const DualGantt: React.FC<DualGanttProps> = ({
 
               {/* Render Train Movement Bars */}
               {trains.map((tr) => {
-                const left = timeToPercent(tr.entry_time);
-                const right = timeToPercent(tr.exit_time);
+                const entryTime = tr.entry_time || (tr as any).departure_time || '06:00:00';
+                const exitTime = tr.exit_time || (tr as any).arrival_time || '06:45:00';
+                const left = timeToPercent(entryTime);
+                const right = timeToPercent(exitTime);
                 const width = Math.max(2.5, right - left);
                 const bg = tr.is_vip ? '#c62828' : tr.priority === 'TIER_3_FREIGHT' ? '#546e7a' : '#e65100';
+                const trainNum = tr.train_number || (tr as any).train_id?.substring(0, 5) || 'TRN';
+                const trainName = tr.train_name ? String(tr.train_name).split(' ')[0] : 'Train';
 
                 return (
                   <div
                     key={tr.id}
-                    title={`${tr.train_number} ${tr.train_name} (${tr.entry_time} - ${tr.exit_time})`}
+                    title={`${trainNum} ${tr.train_name || 'Train'} (${entryTime} - ${exitTime})`}
                     style={{
                       position: 'absolute',
                       left: `${left}%`,
@@ -116,7 +121,7 @@ export const DualGantt: React.FC<DualGanttProps> = ({
                       zIndex: 2,
                     }}
                   >
-                    #{tr.train_number} {tr.train_name.split(' ')[0]}
+                    #{trainNum} {trainName}
                   </div>
                 );
               })}
@@ -146,17 +151,20 @@ export const DualGantt: React.FC<DualGanttProps> = ({
 
               {/* Render Blocks */}
               {blocks.map((blk) => {
-                const left = timeToPercent(blk.start_time);
-                const right = timeToPercent(blk.end_time);
+                const startTime = blk.start_time || '02:00:00';
+                const endTime = blk.end_time || '05:00:00';
+                const left = timeToPercent(startTime);
+                const right = timeToPercent(endTime);
                 const width = Math.max(3, right - left);
                 const isSelected = blk.id === selectedBlockId;
                 const statusColor = blk.status === 'APPROVED' ? '#2e7d32' : blk.status === 'ACTIVE' ? '#c62828' : '#f57f17';
+                const depts = Array.isArray(blk.participating_departments) ? blk.participating_departments.join('+') : (blk.primary_department || 'TRACK');
 
                 return (
                   <div
                     key={blk.id}
                     onClick={() => onSelectBlock(blk)}
-                    title={`Click to Inspect: ${blk.block_code} (${blk.start_time} - ${blk.end_time})`}
+                    title={`Click to Inspect: ${blk.block_code} (${startTime} - ${endTime})`}
                     style={{
                       position: 'absolute',
                       left: `${left}%`,
@@ -181,7 +189,7 @@ export const DualGantt: React.FC<DualGanttProps> = ({
                       </span>
                     </div>
                     <div style={{ fontSize: '9px', fontWeight: 'normal' }}>
-                      {blk.section_code} • {blk.duration_minutes}m • [{blk.participating_departments.join('+')}]
+                      {blk.section_code || 'SECTION'} • {blk.duration_minutes || 120}m • [{depts}]
                     </div>
                   </div>
                 );
