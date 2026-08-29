@@ -634,3 +634,76 @@ def test_end_to_end_optimization_pipeline():
         assert blk.section_code == "MAS-AJJ"
         assert blk.duration_minutes >= 60
         assert len(blk.activities) >= 1
+
+
+def test_pipeline_uses_ml_criticality_before_optimization(monkeypatch):
+    """Stage 2 prediction must become the CI used by clustering and CP-SAT."""
+    section_id = uuid4()
+    target = date(2026, 8, 25)
+    request = MockMaintenanceRequest(
+        id=uuid4(),
+        request_code="MR-TRK-ML-001",
+        section_id=section_id,
+        department="TRACK",
+        activity_type="RAIL_RENEWAL_USFD",
+        duration_minutes=60,
+        priority="LOW",
+        metadata_json={"tgi_deviation": 85.0, "usfd_flaw_severity": 3},
+    )
+
+    def fake_predict(_request, target_date=None):
+        assert target_date == target
+        return {
+            "criticality_index": 93.5,
+            "model_used": "xgboost_shap_v1",
+            "shap_explanation": {
+                "base_value": 34.0,
+                "feature_attributions": {"USFD Ultrasonic Rail Flaw": 40.0},
+                "human_readable_reasoning": "Critical USFD defect.",
+            },
+        }
+
+    monkeypatch.setattr("app.services.optimizer.risk_engine.predict_risk", fake_predict)
+    result = run_optimization_pipeline(
+        movements=[],
+        requests=[request],
+        target_date=target,
+        section_id=section_id,
+        min_gap_minutes=60,
+    )
+
+    assert result.total_blocks_scheduled == 1
+    assert result.total_criticality_index == pytest.approx(93.5)
+    assert result.scheduled_blocks[0].activities[0].criticality_index == pytest.approx(93.5)
+    assert request.metadata_json["criticality_source"] == "ml_risk_engine"
+    assert request.metadata_json["criticality_model"] == "xgboost_shap_v1"
+    assert result.metadata["risk_scoring"]["ml_scored"] == 1
+
+
+def test_pipeline_preserves_explicit_criticality(monkeypatch):
+    """Trusted upstream CI values must not be overwritten by the ML engine."""
+    section_id = uuid4()
+    request = MockMaintenanceRequest(
+        id=uuid4(),
+        request_code="MR-SIG-EXPLICIT-001",
+        section_id=section_id,
+        department="SIGNAL",
+        activity_type="POINT_MACHINE_TEST",
+        duration_minutes=60,
+        metadata_json={"criticality_index": 77.0, "point_failure_risk": 90.0},
+    )
+
+    def unexpected_predict(*args, **kwargs):
+        pytest.fail("Explicit scores must bypass ML inference")
+
+    monkeypatch.setattr("app.services.optimizer.risk_engine.predict_risk", unexpected_predict)
+    result = run_optimization_pipeline(
+        movements=[],
+        requests=[request],
+        target_date=date(2026, 8, 25),
+        section_id=section_id,
+        min_gap_minutes=60,
+    )
+
+    assert result.total_criticality_index == pytest.approx(77.0)
+    assert result.metadata["risk_scoring"]["explicit_scores_preserved"] == 1

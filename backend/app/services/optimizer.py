@@ -38,6 +38,7 @@ from app.services.clustering import (
     cluster_shadow_blocks,
 )
 from app.services.gap_extractor import CorridorGap, extract_corridor_gaps
+from app.services.ml_risk_engine import risk_engine
 
 
 # ── Domain Data Structures (Frozen Dataclasses) ─────────────
@@ -607,6 +608,64 @@ def solve_block_schedule(
 # ── Full Optimization Pipeline Orchestrator ─────────────────
 
 
+_EXPLICIT_CI_KEYS = ("criticality_index", "criticality_score", "safety_risk_index", "ci")
+
+
+def _score_requests_for_optimization(
+    requests: Sequence[Any],
+    target_date: date,
+) -> Dict[str, int]:
+    """Attach ML Criticality Indices before clustering and optimization.
+
+    Explicit upstream scores are preserved. Requests without a score are passed
+    through the Stage 2 risk engine, and the prediction plus its explanation are
+    placed in request metadata so Stage 4's canonical CI reader consumes it.
+    If the model is degraded, no value is injected and clustering retains its
+    deterministic priority/formula fallback.
+    """
+    summary = {"ml_scored": 0, "explicit_scores_preserved": 0, "fallback_scores": 0}
+
+    for request in requests:
+        if isinstance(request, dict):
+            metadata = request.get("metadata_json") or request.get("metadata") or {}
+        else:
+            metadata = getattr(request, "metadata_json", None) or {}
+
+        metadata = dict(metadata)
+        if any(metadata.get(key) is not None for key in _EXPLICIT_CI_KEYS):
+            summary["explicit_scores_preserved"] += 1
+            continue
+
+        direct_ci = None if isinstance(request, dict) else getattr(request, "criticality_index", None)
+        if direct_ci is not None:
+            summary["explicit_scores_preserved"] += 1
+            continue
+
+        prediction = risk_engine.predict_risk(request, target_date=target_date)
+        if prediction.get("model_used") == "deterministic_fallback":
+            summary["fallback_scores"] += 1
+            continue
+
+        metadata.update(
+            {
+                "criticality_index": prediction["criticality_index"],
+                "criticality_source": "ml_risk_engine",
+                "criticality_model": prediction["model_used"],
+                "criticality_explanation": prediction["shap_explanation"],
+            }
+        )
+        if isinstance(request, dict):
+            if "metadata" in request and "metadata_json" not in request:
+                request["metadata"] = metadata
+            else:
+                request["metadata_json"] = metadata
+        else:
+            setattr(request, "metadata_json", metadata)
+        summary["ml_scored"] += 1
+
+    return summary
+
+
 def run_optimization_pipeline(
     movements: Sequence[Any],
     requests: Sequence[Any],
@@ -622,11 +681,12 @@ def run_optimization_pipeline(
     max_solver_time_seconds: Optional[int] = None,
     horizon_days: int = 1,
 ) -> OptimizationResult:
-    """Run the complete end-to-end RailBlock Stage 3 -> 4 -> 5 optimization pipeline.
+    """Run the complete end-to-end RailBlock Stage 2 -> 3 -> 4 -> 5 pipeline.
 
-    1. Stage 3 (gap_extractor): Extracts unoccupied corridor gaps from timetabled train movements.
-    2. Stage 4 (clustering): Groups pending maintenance requests into candidate Joint Shadow Blocks.
-    3. Stage 5 (optimizer): Mixed-integer linear programming (MILP / CP-SAT) space-time scheduling.
+    1. Stage 2 (ml_risk_engine): Scores unscored maintenance requests with XGBoost + SHAP.
+    2. Stage 3 (gap_extractor): Extracts unoccupied corridor gaps from timetabled train movements.
+    3. Stage 4 (clustering): Groups pending maintenance requests into candidate Joint Shadow Blocks.
+    4. Stage 5 (optimizer): Mixed-integer linear programming (MILP / CP-SAT) space-time scheduling.
 
     Args:
         movements: Sequence of timetabled TrainMovement records.
@@ -650,7 +710,10 @@ def run_optimization_pipeline(
     sec_buffer = safety_buffer_minutes if safety_buffer_minutes is not None else settings.DEFAULT_SAFETY_BUFFER_MINUTES
     gap_min = min_gap_minutes if min_gap_minutes is not None else settings.DEFAULT_MIN_GAP_MINUTES
 
-    # 1. Determine target sections to process
+    # 1. Score unscored requests using the Stage 2 ML engine.
+    scoring_summary = _score_requests_for_optimization(requests, effective_date)
+
+    # 2. Determine target sections to process
     target_sections: Set[UUID] = set()
     if section_id is not None:
         target_sections.add(section_id)
@@ -664,7 +727,7 @@ def run_optimization_pipeline(
             if s_id is not None:
                 target_sections.add(s_id)
 
-    # 2. Extract Corridor Gaps across all sections (Stage 3)
+    # 3. Extract Corridor Gaps across all sections (Stage 3)
     all_gaps: List[CorridorGap] = []
     for s_id in target_sections:
         sec_gaps = extract_corridor_gaps(
@@ -677,7 +740,7 @@ def run_optimization_pipeline(
         )
         all_gaps.extend(sec_gaps)
 
-    # 3. Cluster Maintenance Requests into Candidate Shadow Blocks (Stage 4)
+    # 4. Cluster Maintenance Requests into Candidate Shadow Blocks (Stage 4)
     candidate_blocks = cluster_shadow_blocks(
         requests=requests,
         compatibility_rules=compatibility_rules,
@@ -685,10 +748,10 @@ def run_optimization_pipeline(
         section_code_map=section_code_map,
     )
 
-    # 4. Solve Space-Time Constraint Optimization Problem (Stage 5)
+    # 5. Solve Space-Time Constraint Optimization Problem (Stage 5)
     all_req_ids = [getattr(r, "id", None) for r in requests if getattr(r, "id", None) is not None]
 
-    return solve_block_schedule(
+    result = solve_block_schedule(
         gaps=all_gaps,
         candidate_blocks=candidate_blocks,
         resources=resources,
@@ -698,3 +761,11 @@ def run_optimization_pipeline(
         target_date=effective_date,
         all_request_ids=all_req_ids,
     )
+    result.metadata["risk_scoring"] = scoring_summary
+    result.metadata["pipeline_stages"] = [
+        "ml_risk_scoring",
+        "gap_extraction",
+        "shadow_clustering",
+        "cp_sat_optimization",
+    ]
+    return result
