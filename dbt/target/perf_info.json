@@ -1,0 +1,51 @@
+{
+    "path_count": 143,
+    "parsed_path_count": 143,
+    "static_analysis_path_count": 12,
+    "static_analysis_parsed_path_count": 12,
+    "is_partial_parse_enabled": true,
+    "is_static_analysis_enabled": true,
+    "read_files_elapsed": 0.03024354099999993,
+    "load_macros_elapsed": 0.2955515000000002,
+    "parse_project_elapsed": 0.15902095800000016,
+    "patch_sources_elapsed": 0.010081958000000668,
+    "process_manifest_elapsed": 0.013373457999999339,
+    "load_all_elapsed": 0.5542613329999995,
+    "projects": [
+        {
+            "project_name": "railblock_dbt",
+            "elapsed": 0.15478083200000015,
+            "parsers": [
+                {
+                    "parser": "model",
+                    "elapsed": 0.1026166669999995,
+                    "parsed_path_count": 12
+                },
+                {
+                    "parser": "test",
+                    "elapsed": 0.05018058400000047,
+                    "parsed_path_count": 2
+                }
+            ],
+            "parsed_path_count": 14
+        },
+        {
+            "project_name": "dbt_postgres",
+            "elapsed": 0.0022317499999990886,
+            "parsers": [],
+            "parsed_path_count": 0
+        },
+        {
+            "project_name": "dbt",
+            "elapsed": 0.001951791999998953,
+            "parsers": [
+                {
+                    "parser": "doc",
+                    "elapsed": 0.0001011250000004793,
+                    "parsed_path_count": 1
+                }
+            ],
+            "parsed_path_count": 1
+        }
+    ]
+}
