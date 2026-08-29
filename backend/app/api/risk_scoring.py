@@ -18,6 +18,7 @@ router = APIRouter(prefix="/risk", tags=["Stage 2 — AI Risk & Criticality Scor
 class RiskPredictionRequest(BaseModel):
     """Payload for maintenance request risk prediction."""
 
+    request_code: Optional[str] = Field(None, description="Maintenance request identifier")
     department: str = Field("TRACK", description="Department (TRACK, SIGNAL, TRACTION)")
     activity_type: str = Field("RAIL_RENEWAL", description="Type of maintenance activity")
     priority: Optional[str] = Field("MEDIUM", description="Priority string")
@@ -25,6 +26,10 @@ class RiskPredictionRequest(BaseModel):
     metadata_json: Optional[Dict[str, Any]] = Field(
         default_factory=dict,
         description="Defect telemetry parameters (tgi_deviation, speed_restriction_kmh, usfd_flaw_severity, etc.)",
+    )
+    metadata: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Alias used by TMS/SMMS/TDMS clients for defect telemetry",
     )
 
 
@@ -41,6 +46,7 @@ class RiskPredictionResponse(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
+    request_code: Optional[str] = Field(None, description="Echoed maintenance request identifier")
     criticality_index: float = Field(..., description="Predicted Criticality Index score (0 to 100)")
     model_used: str = Field(..., description="Model identifier used for scoring")
     shap_explanation: SHAPExplanationSchema = Field(..., description="SHAP feature attribution breakdown")
@@ -65,6 +71,7 @@ async def predict_request_risk(req: RiskPredictionRequest) -> RiskPredictionResp
         prediction = risk_engine.predict_risk(req_dict)
 
         return RiskPredictionResponse(
+            request_code=req.request_code,
             criticality_index=prediction["criticality_index"],
             model_used=prediction["model_used"],
             shap_explanation=SHAPExplanationSchema(**prediction["shap_explanation"]),
@@ -75,6 +82,16 @@ async def predict_request_risk(req: RiskPredictionRequest) -> RiskPredictionResp
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to calculate risk score: {str(exc)}",
         ) from exc
+
+
+router.add_api_route(
+    "/score",
+    predict_request_risk,
+    methods=["POST"],
+    response_model=RiskPredictionResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Score maintenance risk (canonical alias)",
+)
 
 
 @router.get(

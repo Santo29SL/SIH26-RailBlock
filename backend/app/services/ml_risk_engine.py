@@ -8,17 +8,14 @@ for maintenance requests across Track (TMS), Signal (SMMS), and Traction (TDMS) 
 from __future__ import annotations
 
 import logging
-import os
 from datetime import date
-from typing import Any, Dict, List, Optional, Tuple
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 import joblib
-import numpy as np
 import pandas as pd
 import shap
 import xgboost as xgb
-
-from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +31,7 @@ FEATURE_COLUMNS = [
     "ohe_insulator_wear",  # 0 to 100
 ]
 
-MODEL_CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "ml_models")
-MODEL_PATH = os.path.join(MODEL_CACHE_DIR, "criticality_xgboost_v1.joblib")
+MODEL_PATH = Path(__file__).resolve().parents[2] / "data" / "ml_models" / "criticality_xgboost_v1.joblib"
 
 
 class RiskScoringEngine:
@@ -46,67 +42,15 @@ class RiskScoringEngine:
         self.explainer: Optional[shap.TreeExplainer] = None
         self._initialize_or_load_model()
 
-    def _generate_synthetic_training_data(self, n_samples: int = 2000) -> Tuple[pd.DataFrame, np.ndarray]:
-        """Generate domain-grounded synthetic training data for Indian Railways maintenance defects."""
-        np.random.seed(42)
-
-        tgi = np.random.uniform(0, 100, n_samples)
-        speed_rest = np.random.uniform(0, 100, n_samples)
-        days_overdue = np.random.uniform(0, 45, n_samples)
-        gmt = np.random.uniform(5, 120, n_samples)
-        dept = np.random.choice([0, 1, 2], n_samples)  # TRACK, SIGNAL, TRACTION
-        usfd = np.random.choice([0, 1, 2, 3], n_samples, p=[0.5, 0.25, 0.15, 0.10])
-        point_risk = np.random.uniform(0, 100, n_samples)
-        ohe_wear = np.random.uniform(0, 100, n_samples)
-
-        # Ground truth Criticality Index equation + domain non-linear interaction noise
-        ci = (
-            0.30 * tgi
-            + 0.20 * speed_rest
-            + 0.65 * (days_overdue * 2.0)
-            + 0.15 * gmt
-            + 12.0 * usfd
-            + 0.15 * (point_risk * (dept == 1))
-            + 0.15 * (ohe_wear * (dept == 2))
-            + np.random.normal(0, 2.5, n_samples)
-        )
-        ci = np.clip(ci, 0.0, 100.0)
-
-        df = pd.DataFrame(
-            {
-                "tgi_deviation": tgi,
-                "speed_restriction_kmh": speed_rest,
-                "days_overdue": days_overdue,
-                "section_gmt_density": gmt,
-                "department_code": dept,
-                "usfd_flaw_severity": usfd,
-                "point_failure_risk": point_risk,
-                "ohe_insulator_wear": ohe_wear,
-            }
-        )
-        return df, ci
-
     def _initialize_or_load_model(self) -> None:
-        """Train or load pretrained XGBoost model and setup SHAP explainer."""
+        """Load the offline-trained model and set up SHAP; never train at startup."""
         try:
-            if os.path.exists(MODEL_PATH):
-                logger.info(f"Loading pretrained XGBoost Risk Model from {MODEL_PATH}")
-                self.model = joblib.load(MODEL_PATH)
-            else:
-                logger.info("Building and training initial XGBoost Risk Model...")
-                X, y = self._generate_synthetic_training_data()
-                self.model = xgb.XGBRegressor(
-                    n_estimators=100,
-                    max_depth=4,
-                    learning_rate=0.08,
-                    random_state=42,
-                )
-                self.model.fit(X, y)
-                os.makedirs(MODEL_CACHE_DIR, exist_ok=True)
-                joblib.dump(self.model, MODEL_PATH)
-
+            if not MODEL_PATH.is_file():
+                raise FileNotFoundError(f"Model artifact not found: {MODEL_PATH}; run python ml/train.py")
+            logger.info("Loading pretrained Risk Model from %s", MODEL_PATH)
+            self.model = joblib.load(MODEL_PATH)
             self.explainer = shap.TreeExplainer(self.model)
-            logger.info("✅ XGBoost + SHAP Risk Engine initialized successfully.")
+            logger.info("XGBoost + SHAP Risk Engine initialized successfully.")
         except Exception as e:
             logger.warning(f"Failed to initialize ML model ({e}); will use deterministic fallback.")
             self.model = None
@@ -156,7 +100,7 @@ class RiskScoringEngine:
 
         return {
             "tgi_deviation": min(100.0, max(0.0, tgi)),
-            "speed_restriction_kmh": min(100.0, max(0.0, speed_rest)),
+            "speed_restriction_kmh": min(120.0, max(0.0, speed_rest)),
             "days_overdue": min(60.0, max(0.0, days_overdue)),
             "section_gmt_density": min(150.0, max(0.0, gmt)),
             "department_code": float(dept_code),
@@ -177,6 +121,7 @@ class RiskScoringEngine:
                 "criticality_index": 50.0,
                 "model_used": "deterministic_fallback",
                 "shap_explanation": {
+                    "base_value": 50.0,
                     "human_readable_reasoning": "ML Engine unavailable; using fallback score.",
                     "feature_attributions": {},
                 },
