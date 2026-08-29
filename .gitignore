@@ -1,16 +1,14 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Virtual environments
-venv/
-.venv
-.venv/
-# Environment & Secrets
+# ── Environment & Secrets ───────────────────────────────────
+# Ignore all variations of .env files while keeping example templates
 .env
 .env.*
+*.env
+*.env.*
 !.env.example
+!*.env.example
+airflow.env
+
+# Certificates & Keys
 *.pem
 *.key
 *.pfx
@@ -22,7 +20,82 @@ client_secrets*.json
 id_rsa*
 id_ed25519*
 
-# IDE & Editor
+# ── Python & Environments ────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ── Testing & Code Quality ──────────────────────────────────
+.pytest_cache/
+**/.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# ── Frontend & Vite ─────────────────────────────────────────
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+build/
+frontend/build/
+.vite/
+frontend/.vite/
+**/.vite/
+*.log
+
+# ── dbt (Data Build Tool) ───────────────────────────────────
+dbt/target/
+target/
+dbt/dbt_packages/
+dbt_packages/
+dbt/.user.yml
+*.user.yml
+dbt/logs/
+
+# ── Machine Learning Training Logs & Debris ──────────────────
+catboost_info/
+**/catboost_info/
+ml/catboost_info/
+*.tfevents*
+lightning_logs/
+wandb/
+ml/models/*.joblib
+ml/models/*.pkl
+ml/data/*.csv
+
+# ── Apache Airflow ──────────────────────────────────────────
+airflow_logs/
+airflow/logs/
+airflow.cfg
+airflow.db
+airflow/plugins/__pycache__/
+
+# ── Database ────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Docker ──────────────────────────────────────────────────
+docker-compose.override.yml
+
+# ── Alembic ─────────────────────────────────────────────────
+alembic/versions/__pycache__/
+backend/alembic/versions/__pycache__/
+
+# ── Operating System & Editors ──────────────────────────────
+.DS_Store
+._*
+Thumbs.db
 .vscode/
 .idea/
 *.swp
@@ -30,69 +103,11 @@ id_ed25519*
 .project
 .pydevproject
 .settings/
+.ipynb_checkpoints/
 
-# Agent / Scratch
+# ── Internal Scratch & AI Agents ────────────────────────────
 .gemini/
 .antigravity/
 .scratch/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Python distribution
-*.egg-info/
-dist/
-build/
-*.egg
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
-# Docker
-docker-compose.override.yml
-
-# Alembic
-alembic/versions/__pycache__/
-backend/alembic/versions/__pycache__/
-
-# Node / Frontend
-node_modules/
-frontend/node_modules/
-frontend/dist/
-frontend/build/
-*.log
-
-# Airflow
-airflow_logs/
-airflow.cfg
-airflow.db
-
-# Tickets & Tracking
 docs/tickets/
 docs/ticket/
-
-# Data files (raw downloads — don't commit large datasets)
-data/raw/
-
-# ML models & training artifacts (too large for git)
-ml/models/*.joblib
-ml/models/*.pkl
-ml/data/*.csv
-catboost_info/
-ml/catboost_info/
-
-# Jupyter
-.ipynb_checkpoints/
-
-# Testing
-.coverage
-htmlcov/
-.pytest_cache/
-backend/.pytest_cache/
-
-# Airflow
-airflow/logs/
-airflow/plugins/__pycache__/
