@@ -52,9 +52,10 @@ code, .mono {
 
 /* Base utility classes */
 .ir-container {
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 8px;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 12px 16px;
 }
 
 .ir-panel {
