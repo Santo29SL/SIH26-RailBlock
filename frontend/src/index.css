@@ -218,3 +218,467 @@ code, .mono {
   color: var(--ir-green);
   border-color: var(--ir-green);
 }
+
+/* ── Tab Navigation ───────────────────────────────────── */
+
+.ir-tabs {
+  display: flex;
+  background: var(--ir-blue-dark);
+  border-bottom: 3px solid var(--ir-orange);
+  overflow-x: auto;
+}
+
+.ir-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: rgba(255,255,255,0.65);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.ir-tab:hover {
+  color: #fff;
+  background: rgba(255,255,255,0.06);
+}
+
+.ir-tab.active {
+  color: var(--ir-orange);
+  border-bottom-color: var(--ir-orange);
+  background: rgba(243,112,33,0.08);
+}
+
+/* ── KPI / Stat Cards ─────────────────────────────────── */
+
+.ir-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.ir-kpi-card {
+  background: #fff;
+  border: 1px solid var(--ir-border-light);
+  border-top: 3px solid var(--ir-navy);
+  padding: 12px 14px;
+}
+
+.ir-kpi-card.orange { border-top-color: var(--ir-orange); }
+.ir-kpi-card.green  { border-top-color: var(--ir-green); }
+.ir-kpi-card.red    { border-top-color: var(--ir-red); }
+.ir-kpi-card.gold   { border-top-color: #e6a817; }
+
+.ir-kpi-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ir-text-secondary);
+  margin-bottom: 4px;
+}
+
+.ir-kpi-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ir-navy);
+  line-height: 1.1;
+}
+
+.ir-kpi-sub {
+  font-size: 10px;
+  color: var(--ir-text-secondary);
+  margin-top: 3px;
+}
+
+/* ── Two-Column Layout ────────────────────────────────── */
+
+.ir-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.ir-three-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 900px) {
+  .ir-two-col, .ir-three-col { grid-template-columns: 1fr; }
+}
+
+/* ── Gantt Chart ──────────────────────────────────────── */
+
+.ir-gantt-wrap {
+  overflow-x: auto;
+}
+
+.ir-gantt-svg {
+  display: block;
+  width: 100%;
+  min-width: 900px;
+  font-family: 'Roboto', Arial, sans-serif;
+}
+
+/* ── Form Rows ────────────────────────────────────────── */
+
+.ir-form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+  align-items: end;
+}
+
+.ir-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ir-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--ir-text-secondary);
+  letter-spacing: 0.3px;
+}
+
+.ir-input,
+.ir-select {
+  padding: 5px 8px;
+  font-size: 12px;
+  border: 1px solid var(--ir-border);
+  background: #fff;
+  color: var(--ir-text-primary);
+  width: 100%;
+  font-family: inherit;
+}
+
+.ir-input:focus,
+.ir-select:focus {
+  outline: 2px solid var(--ir-navy);
+  outline-offset: -1px;
+}
+
+/* ── Status Badge Colours ─────────────────────────────── */
+
+.ir-badge-approved {
+  background-color: #e3f2fd;
+  color: #0d47a1;
+  border-color: #1565c0;
+}
+
+.ir-badge-cancelled {
+  background-color: #f5f5f5;
+  color: #616161;
+  border-color: #9e9e9e;
+}
+
+.ir-badge-pending {
+  background-color: #fff8e1;
+  color: #f57f17;
+  border-color: #fbc02d;
+}
+
+.ir-badge-scheduled {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  border-color: #388e3c;
+}
+
+.ir-badge-track { background: #e3f2fd; color: #0d47a1; border-color: #1565c0; }
+.ir-badge-signal { background: #fff3e0; color: #e65100; border-color: #ef6c00; }
+.ir-badge-traction { background: #f3e5f5; color: #6a1b9a; border-color: #7b1fa2; }
+
+/* ── Loading / Error States ───────────────────────────── */
+
+.ir-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  font-size: 13px;
+  color: var(--ir-text-secondary);
+  gap: 10px;
+}
+
+.ir-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--ir-border-light);
+  border-top-color: var(--ir-navy);
+  border-radius: 50%;
+  animation: ir-spin 0.7s linear infinite;
+}
+
+@keyframes ir-spin { to { transform: rotate(360deg); } }
+
+.ir-error {
+  padding: 16px;
+  background: #ffebee;
+  border: 1px solid #f44336;
+  color: #b71c1c;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.ir-empty {
+  padding: 30px;
+  text-align: center;
+  color: var(--ir-text-secondary);
+  font-size: 12px;
+  border: 1px dashed var(--ir-border-light);
+}
+
+/* ── Notification Toast ───────────────────────────────── */
+
+.ir-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: var(--ir-navy);
+  color: #fff;
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  border-left: 4px solid var(--ir-orange);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+  z-index: 9999;
+  max-width: 360px;
+  animation: ir-slidein 0.2s ease;
+}
+
+.ir-toast.error { border-left-color: var(--ir-red); }
+.ir-toast.success { border-left-color: var(--ir-green); }
+
+@keyframes ir-slidein {
+  from { transform: translateX(40px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+/* ── Modal ────────────────────────────────────────────── */
+
+.ir-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 1000;
+  padding: 40px 16px;
+  overflow-y: auto;
+}
+
+.ir-modal {
+  background: #fff;
+  border: 1px solid var(--ir-border);
+  width: 100%;
+  max-width: 700px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+
+.ir-modal-header {
+  background: var(--ir-navy);
+  color: #fff;
+  padding: 8px 14px;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid var(--ir-orange);
+}
+
+.ir-modal-close {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0 4px;
+  opacity: 0.7;
+}
+.ir-modal-close:hover { opacity: 1; }
+
+.ir-modal-body { padding: 14px; }
+
+/* ── Risk CI Score Bar ────────────────────────────────── */
+
+.ir-ci-bar-wrap {
+  background: #eee;
+  height: 6px;
+  width: 100%;
+  position: relative;
+}
+
+.ir-ci-bar {
+  height: 6px;
+  background: var(--ir-orange);
+  transition: width 0.3s;
+}
+
+.ir-ci-bar.high  { background: var(--ir-red); }
+.ir-ci-bar.medium { background: var(--ir-orange); }
+.ir-ci-bar.low   { background: var(--ir-green); }
+
+/* ── SHAP Explanation ─────────────────────────────────── */
+
+.ir-shap-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 11px;
+}
+
+.ir-shap-bar {
+  height: 8px;
+  min-width: 2px;
+  display: inline-block;
+}
+
+/* ── Statutory Form Display ───────────────────────────── */
+
+.ir-form-doc {
+  border: 2px solid var(--ir-navy);
+  padding: 14px;
+  background: #fff;
+}
+
+.ir-form-doc-title {
+  text-align: center;
+  font-weight: 700;
+  font-size: 14px;
+  text-transform: uppercase;
+  border-bottom: 2px solid var(--ir-navy);
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+  letter-spacing: 1px;
+}
+
+.ir-form-doc-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.ir-form-doc-key {
+  font-weight: 700;
+  min-width: 180px;
+  color: var(--ir-navy);
+}
+
+.ir-form-doc-val {
+  flex: 1;
+  border-bottom: 1px dotted #999;
+  padding-bottom: 2px;
+}
+
+/* ── Block State Machine ──────────────────────────────── */
+
+.ir-state-flow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ir-state-node {
+  padding: 4px 10px;
+  border: 2px solid var(--ir-border-light);
+  background: #f8f9fa;
+  color: var(--ir-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.ir-state-node.active-state {
+  border-color: var(--ir-orange);
+  background: #fff3e0;
+  color: var(--ir-orange-dark);
+}
+
+.ir-state-node.done-state {
+  border-color: var(--ir-green);
+  background: #e8f5e9;
+  color: var(--ir-green);
+}
+
+.ir-state-node.cancelled-state {
+  border-color: #9e9e9e;
+  background: #f5f5f5;
+  color: #616161;
+}
+
+.ir-state-arrow {
+  color: var(--ir-border);
+  font-size: 14px;
+}
+
+/* ── Pagination ───────────────────────────────────────── */
+
+.ir-pagination {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0;
+  font-size: 12px;
+}
+
+/* ── WebSocket Events ─────────────────────────────────── */
+
+.ir-ws-event {
+  padding: 6px 8px;
+  border-left: 3px solid var(--ir-navy);
+  background: #f8f9fa;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.ir-ws-event.delay   { border-left-color: var(--ir-red); }
+.ir-ws-event.info    { border-left-color: var(--ir-blue-light); }
+.ir-ws-event.success { border-left-color: var(--ir-green); }
+
+/* ── Pre / Code ───────────────────────────────────────── */
+
+.ir-pre {
+  background: #1e2328;
+  color: #e0e0e0;
+  padding: 12px;
+  font-size: 11px;
+  font-family: 'Roboto Mono', Menlo, monospace;
+  overflow-x: auto;
+  max-height: 400px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Inline divider ───────────────────────────────────── */
+
+.ir-divider {
+  border: none;
+  border-top: 1px solid var(--ir-border-light);
+  margin: 10px 0;
+}
+
