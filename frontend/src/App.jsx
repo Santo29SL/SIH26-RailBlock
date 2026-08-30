@@ -1,14 +1,14 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Activity, Map, Calendar, Zap, AlertTriangle } from 'lucide-react';
+import { Activity, Map, Calendar } from 'lucide-react';
 import NetworkMap from './components/NetworkMap';
 import LandingPage from './components/LandingPage';
 import Dashboard from './components/Dashboard';
 import BlockSchedule from './components/BlockSchedule';
 
 const navItems = [
-  { to: '/dashboard', icon: Activity, label: 'Command' },
-  { to: '/map',       icon: Map,      label: 'Network' },
-  { to: '/schedule',  icon: Calendar,  label: 'Schedule' },
+  { to: '/dashboard', icon: Activity, label: 'Overview',      sub: 'Live status & alerts' },
+  { to: '/map',       icon: Map,      label: 'Track Map',     sub: 'See defects on map' },
+  { to: '/schedule',  icon: Calendar, label: 'Block Timeline',sub: 'Maintenance schedule' },
 ];
 
 function Sidebar() {
@@ -56,25 +56,26 @@ function Sidebar() {
       </Link>
 
       {/* Nav */}
-      <nav style={{ flex: 1, padding: '10px 10px' }}>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.14em', color: 'var(--text-3)', padding: '8px 12px 6px', textTransform: 'uppercase' }}>Control</div>
-        {navItems.map(({ to, icon: Icon, label }) => {
+      <nav style={{ flex: 1, padding: '8px 10px' }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.14em', color: 'var(--text-3)', padding: '8px 12px 6px', textTransform: 'uppercase' }}>Pages</div>
+        {navItems.map(({ to, icon: Icon, label, sub }) => {
           const active = pathname === to;
           return (
             <Link key={to} to={to} style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '9px 12px', marginBottom: 2,
-              textDecoration: 'none', fontSize: 13,
-              fontFamily: 'var(--font-body)',
-              fontWeight: active ? 500 : 400,
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '10px 12px', marginBottom: 2,
+              textDecoration: 'none',
               color: active ? 'var(--amber)' : 'var(--text-2)',
-              background: active ? 'rgba(245 158 11 / .1)' : 'transparent',
+              background: active ? 'rgba(245 158 11 / .08)' : 'transparent',
               borderLeft: `2px solid ${active ? 'var(--amber)' : 'transparent'}`,
               borderRadius: '0 var(--r1) var(--r1) 0',
               transition: 'all .15s',
             }}>
-              <Icon size={15} style={{ flexShrink: 0 }} />
-              {label}
+              <Icon size={16} style={{ flexShrink: 0, opacity: active ? 1 : .65 }} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: active ? 600 : 400, fontFamily: 'var(--font-body)', lineHeight: 1.2 }}>{label}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-3)', fontFamily: 'var(--font-body)', marginTop: 2 }}>{sub}</div>
+              </div>
             </Link>
           );
         })}
@@ -89,10 +90,10 @@ function Sidebar() {
           <span className="signal-dot amber" style={{ width: 6, height: 6 }} />
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.1em', color: 'var(--text-3)', textTransform: 'uppercase' }}>System Active</span>
         </div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-3)', letterSpacing: '.06em', lineHeight: 1.7 }}>
-          <div>NDLS–GZB · 46.2 km</div>
-          <div>4 UP / DN lines</div>
-          <div>PS 26027 · SIH 2026</div>
+        <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--text-3)', lineHeight: 1.7 }}>
+          <div>New Delhi → Ghaziabad</div>
+          <div>46.2 km corridor</div>
+          <div style={{ marginTop: 4, color: 'var(--text-3)', fontSize: 10 }}>SIH 2026 · PS 26027</div>
         </div>
       </div>
     </aside>
@@ -102,9 +103,9 @@ function Sidebar() {
 function AppHeader() {
   const { pathname } = useLocation();
   const titles = {
-    '/dashboard': { label: 'Command Dashboard', sub: 'Live block planning metrics' },
-    '/map':       { label: 'Network Map',        sub: 'Section defects & GIS overlay' },
-    '/schedule':  { label: 'Block Schedule',      sub: 'Gantt timeline · weekly view' },
+    '/dashboard': { label: 'Overview',       sub: 'Live status · active maintenance · alerts' },
+    '/map':       { label: 'Track Map',      sub: 'Defects & sections · New Delhi → Ghaziabad' },
+    '/schedule':  { label: 'Block Timeline', sub: 'Hour-by-hour maintenance schedule' },
   };
   const { label, sub } = titles[pathname] ?? { label: 'RailBlock', sub: '' };
   return (
@@ -115,26 +116,16 @@ function AppHeader() {
       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
       flexShrink: 0,
     }}>
-      <div>
+      <div style={{ flex: 1, minWidth: 0, marginRight: 24 }}>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 600, letterSpacing: '.04em', lineHeight: 1 }}>{label}</div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-3)', marginTop: 3, letterSpacing: '.04em' }}>{sub}</div>
+        <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--text-3)', marginTop: 5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-3)' }}>
-          <Zap size={11} style={{ color: 'var(--amber)' }} />
-          BDMS · READ-ONLY
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-3)' }}>
-          <AlertTriangle size={11} style={{ color: 'var(--orange)' }} />
-          G&amp;SR ENFORCED
-        </div>
-        <div style={{
-          width: 28, height: 28, borderRadius: '50%',
-          background: 'var(--amber)', display: 'flex',
-          alignItems: 'center', justifyContent: 'center',
-          fontFamily: 'var(--font-display)', fontWeight: 700,
-          fontSize: 12, color: '#05070d',
-        }}>SC</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+        <span style={{ fontSize: 12, color: 'var(--text-3)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 20, padding: '4px 12px', display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)' }} />
+          View only
+        </span>
+        <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, color: '#05070d' }}>SC</div>
       </div>
     </header>
   );

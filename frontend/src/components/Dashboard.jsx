@@ -122,7 +122,7 @@ export default function Dashboard() {
             )}
           </div>
           <p style={{ margin: 0, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-3)' }}>
-            Auto-refreshes every 30s · NDLS–GZB corridor · NR Delhi Division
+            Updates every 30 seconds · New Delhi → Ghaziabad · Northern Railway
           </p>
         </div>
         <button
@@ -160,13 +160,13 @@ export default function Dashboard() {
 
       {/* Stat cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(210px,1fr))', gap: 16, marginBottom: 28 }}>
-        <StatCard icon={Activity}      label="Total Blocks"      value={blocks.length}               color="var(--violet)" />
-        <StatCard icon={Clock}         label="Active Blocks"     value={byStatus.ACTIVE ?? 0}        color="var(--amber)"
-          sub={`${byStatus.PROPOSED ?? 0} proposed · ${byStatus.APPROVED ?? 0} approved`} />
-        <StatCard icon={CheckCircle2}  label="Completed"         value={byStatus.COMPLETED ?? 0}     color="var(--green)"
+        <StatCard icon={Activity}      label="Total Blocks"          value={blocks.length}               color="var(--violet)" />
+        <StatCard icon={Clock}         label="In Progress"           value={byStatus.ACTIVE ?? 0}        color="var(--amber)"
+          sub={`${byStatus.PROPOSED ?? 0} waiting · ${byStatus.APPROVED ?? 0} approved`} />
+        <StatCard icon={CheckCircle2}  label="Completed"             value={byStatus.COMPLETED ?? 0}     color="var(--green)"
           sub={`${byStatus.CANCELLED ?? 0} cancelled`} />
-        <StatCard icon={AlertTriangle} label="Critical Requests" value={criticalMaint}               color="var(--red)"
-          sub={`${pendingMaint} pending total`} />
+        <StatCard icon={AlertTriangle} label="Urgent Issues"         value={criticalMaint}               color="var(--red)"
+          sub={`${pendingMaint} jobs still pending`} />
       </div>
 
       {/* Two-col */}
@@ -175,7 +175,7 @@ export default function Dashboard() {
         {/* Recent blocks */}
         <section style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', overflow: 'hidden' }}>
           <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 600 }}>Recent Blocks</span>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 600 }}>Recent Maintenance Blocks</span>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-3)' }}>{blocks.length} TOTAL</span>
           </div>
           <div style={{ maxHeight: 340, overflowY: 'auto' }}>
@@ -207,7 +207,7 @@ export default function Dashboard() {
         {/* Dept breakdown */}
         <section style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', overflow: 'hidden' }}>
           <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 600 }}>Open Work by Department</span>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 600 }}>Pending Work by Team</span>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-3)' }}>{maintenance.length} REQUESTS</span>
           </div>
           <div style={{ padding: '20px 20px' }}>

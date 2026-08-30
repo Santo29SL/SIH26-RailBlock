@@ -32,8 +32,13 @@ export default function LandingPage() {
         <span className="nav-brand" style={{ marginRight: 'auto' }}>
           <span style={{ color: 'var(--amber)' }}>⬛</span> RAILBLOCK AI
         </span>
-        {['problem','pipeline','shadow','corridor'].map(id => (
-          <a key={id} href={`#${id}`} style={{ fontSize: 12, letterSpacing: '.06em', textTransform: 'uppercase' }}>{id}</a>
+        {[
+          { id: 'problem',  label: 'The Problem' },
+          { id: 'pipeline', label: 'How It Works' },
+          { id: 'shadow',   label: 'The Solution' },
+          { id: 'corridor', label: 'Live Example' },
+        ].map(({ id, label }) => (
+          <a key={id} href={`#${id}`} style={{ fontSize: 13, color: 'var(--text-2)' }}>{label}</a>
         ))}
         <Link to="/dashboard" style={{
           display: 'flex', alignItems: 'center', gap: 7,
@@ -222,10 +227,10 @@ export default function LandingPage() {
       <section id="problem" style={{ borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
         <div style={{ maxWidth: 1300, margin: '0 auto', padding: '36px 48px', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 1, background: 'var(--border)' }}>
           {[
-            { val: '5.5→2.5', unit: 'hrs', desc: 'Possession per section. Three solo blocks → one Joint Shadow Block.' },
-            { val: '25–35', unit: '%',  desc: 'Empirical downtime recovery across routine multi-dept schedules. Peak 55%.' },
-            { val: '< 30',  unit: 's',  desc: 'Greedy heuristic re-solve when train slips > 20 min. MILP handles 7-day base plan.' },
-            { val: '70',    unit: '%',  desc: 'Target reduction in train detention minutes incl. IRPWM post-tamping TSR curves.' },
+            { val: '5.5→2.5', unit: 'hrs', desc: 'Track closed per day reduced — from 3 separate closures to just 1 combined slot.' },
+            { val: '25–35', unit: '%',  desc: 'Less downtime on average. Peak improvement reaches 55% in ideal conditions.' },
+            { val: '< 30',  unit: 's',  desc: 'Time to re-plan if a train runs late. The AI adjusts the schedule automatically.' },
+            { val: '70',    unit: '%',  desc: 'Fewer train delays caused by maintenance work, compared to current practice.' },
           ].map(({ val, unit, desc }) => (
             <div key={val} style={{ background: 'var(--surface)', padding: '28px 28px' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 10 }}>
@@ -240,10 +245,11 @@ export default function LandingPage() {
 
       {/* ── Pipeline ── */}
       <section id="pipeline" style={{ maxWidth: 1300, margin: '0 auto', padding: '72px 48px' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 36 }}>
-          <h2 style={{ margin: 0 }}>Seven stages, five feeds</h2>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '.12em', color: 'var(--text-3)' }}>§3 — END-TO-END PIPELINE</span>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
+          <h2 style={{ margin: 0 }}>How the system works</h2>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '.12em', color: 'var(--text-3)' }}>7 STEPS · FULLY AUTOMATIC</span>
         </div>
+        <p style={{ fontSize: 15, color: 'var(--text-2)', marginBottom: 32 }}>From raw data to a ready-to-sign maintenance plan — no manual effort needed.</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '24px 20px' }}>
           {stages.map((s, i) => (
             <div key={i} style={{
@@ -274,9 +280,9 @@ export default function LandingPage() {
       {/* ── Shadow Block ── */}
       <section id="shadow" style={{ background: 'var(--surface)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
         <div style={{ maxWidth: 1300, margin: '0 auto', padding: '64px 48px' }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 28 }}>
-            <h2 style={{ margin: 0 }}>Shadow blocking, drawn to scale</h2>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '.12em', color: 'var(--text-3)' }}>§4 — FIG. 02</span>
+          <div style={{ marginBottom: 12 }}>
+            <h2 style={{ margin: '0 0 6px' }}>Before vs. After RailBlock</h2>
+            <p style={{ fontSize: 14, color: 'var(--text-2)', margin: 0 }}>The same three maintenance jobs — old way takes 5.5 hours of track closure, RailBlock does it in 2.5 hours.</p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
             {/* Before */}
@@ -331,9 +337,9 @@ export default function LandingPage() {
 
       {/* ── Corridor / Timetable ── */}
       <section id="corridor" style={{ maxWidth: 1300, margin: '0 auto', padding: '72px 48px' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 24 }}>
-          <h2 style={{ margin: 0 }}>Tonight's corridor, NDLS–GZB</h2>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '.12em', color: 'var(--text-3)' }}>§3 — GAP EXTRACTION FROM COA</span>
+        <div style={{ marginBottom: 20 }}>
+          <h2 style={{ margin: '0 0 6px' }}>Tonight's train schedule — New Delhi to Ghaziabad</h2>
+          <p style={{ fontSize: 14, color: 'var(--text-2)', margin: 0 }}>The highlighted row is a 165-minute gap where no priority trains run — the perfect window for maintenance work.</p>
         </div>
         <div style={{ border: '1px solid var(--border-2)', background: 'var(--surface)', overflow: 'hidden' }}>
           <table className="table" style={{ fontSize: 13 }}>
@@ -391,9 +397,9 @@ export default function LandingPage() {
       <section id="signin" style={{ background: 'var(--surface)', borderTop: '1px solid var(--border)' }}>
         <div style={{ maxWidth: 1300, margin: '0 auto', padding: '72px 48px', display: 'grid', gridTemplateColumns: '1fr 440px', gap: 64 }}>
           <div>
-            <h2 style={{ margin: '0 0 16px' }}>Enter the Control Office</h2>
+            <h2 style={{ margin: '0 0 16px' }}>Sign in to the Dashboard</h2>
             <p style={{ fontSize: 16, maxWidth: 540, color: 'var(--text-2)', lineHeight: 1.65 }}>
-              Section Controllers, PWI and S&T engineers sign in against divisional roster. Dashboard is read-only against BDMS until draft proposal is signed with Private Number.
+              Railway engineers and section controllers log in to view the AI-generated maintenance plan. You can browse everything — a supervisor approves before anything is sent out.
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20, marginTop: 36, maxWidth: 560 }}>
               {[['68+','Divisions in scope'],['5 feeds','TMS SMMS TDMS COA BDMS'],['T/351','Statutory notice preserved']].map(([val, lbl]) => (
