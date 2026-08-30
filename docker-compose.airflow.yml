@@ -73,7 +73,7 @@ services:
       - -c
       - "pip install --no-cache-dir dbt-postgres && dbt docs serve --host 0.0.0.0 --port 8085 --no-browser --project-dir dbt --profiles-dir dbt"
     ports:
-      - "8085:8085"
+      - "8086:8085"
     depends_on:
       postgres:
         condition: service_healthy

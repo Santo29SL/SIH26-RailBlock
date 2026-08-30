@@ -27,7 +27,7 @@ import json
 import random
 import re
 import uuid
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -733,10 +733,11 @@ async def seed_database(database_url: str):
     engine = create_async_engine(database_url, echo=False)
     async_session = async_sessionmaker(engine, expire_on_commit=False)
 
-    # Create tables (idempotent)
+    # Create tables (drop old data first for clean fresh seed)
     async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
-    print("✅ Tables ready\n")
+    print("✅ Tables reset and created\n")
 
     # ── Load raw data ────────────────────────────────────────────────────
     stations = load_stations()
