@@ -1,0 +1,29 @@
+{
+  "winner": "xgboost",
+  "samples": 10000,
+  "features": [
+    "tgi_deviation",
+    "speed_restriction_kmh",
+    "days_overdue",
+    "section_gmt_density",
+    "department_code",
+    "usfd_flaw_severity",
+    "point_failure_risk",
+    "ohe_insulator_wear"
+  ],
+  "results": {
+    "xgboost": {
+      "cv_r2": 0.9836522370694782,
+      "cv_rmse": 1.732265271926341,
+      "cv_mae": 1.297638624720955,
+      "test_r2": 0.9851499782131206,
+      "test_rmse": 1.6420341117710908,
+      "test_mae": 1.2727690601177217
+    },
+    "lightgbm": {
+      "cv_r2": 0.9826352941496648,
+      "cv_rmse": 1.7852597881715162,
+      "cv_mae": 1.330385336736748
+    }
+  }
+}
