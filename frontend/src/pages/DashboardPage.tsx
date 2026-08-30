@@ -21,7 +21,6 @@ import { DefectDetailModal } from '../components/map/DefectDetailModal';
 import { LogDefectModal } from '../components/dashboard/LogDefectModal';
 import { InjectTrainModal } from '../components/dashboard/InjectTrainModal';
 import { SystemTourModal } from '../components/dashboard/SystemTourModal';
-import { LandingTrainSequence } from '../components/common/LandingTrainSequence';
 import { CheckCircle2, Wrench, ArrowRight, X, Sparkles, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 interface DashboardPageProps {
@@ -31,9 +30,6 @@ interface DashboardPageProps {
 export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateTab }) => {
   const { selectedSection, planningDate } = useDivision();
   const { simulateDelay } = useTelemetry();
-
-  // Landing sequence plays on every reload
-  const [showTrainLanding, setShowTrainLanding] = useState<boolean>(true);
 
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [trainMovements, setTrainMovements] = useState<TrainMovement[]>([]);
@@ -297,13 +293,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateTab }) =
 
   return (
     <>
-      {/* 1. Animated Vande Bharat Train Landing Sequence on every reload */}
-      {showTrainLanding && (
-        <LandingTrainSequence
-          onComplete={() => setShowTrainLanding(false)}
-        />
-      )}
-
       {/* Live System Action Toast */}
       {toastMessage && (
         <div className="fixed top-20 right-6 z-50 bg-[#213d77] text-white border-2 border-[#fb792b] px-4 py-2.5 rounded-2xl shadow-2xl flex items-center space-x-2 text-xs font-mono font-bold animate-in slide-in-from-top-4 duration-200">
@@ -313,7 +302,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateTab }) =
       )}
 
       <div className="space-y-4 font-sans">
-        {/* 2. Interactive Corridor Operations Workflow Bar */}
+        {/* 1. Interactive Corridor Operations Workflow Bar */}
         <JudgeScenarioBar
           onRunTest1_LogDefect={handleStage1IngestionTest}
           onRunTest2_InjectDelay={() => handleInjectDelayEvent('12951', 35)}
@@ -322,7 +311,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateTab }) =
           onOpenTour={() => setShowTourModal(true)}
         />
 
-        {/* 3. Stage 1 Ingestion Processing Confirmation Banner */}
+        {/* 2. Stage 1 Ingestion Processing Confirmation Banner */}
         {stage1IngestedDefect && (
           <div className="bg-white border-2 border-[#fb792b] text-slate-900 rounded-3xl p-4 shadow-md animate-in fade-in duration-200 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center space-x-3">
@@ -366,7 +355,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateTab }) =
           </div>
         )}
 
-        {/* 4. Live Active Disruption & Automated Reschedule Solution Card */}
+        {/* 3. Live Active Disruption & Automated Reschedule Solution Card */}
         {showDisruptionCard && (
           <ActiveDisruptionResolutionCard
             delayedTrainNumber={activeDelayTrainNumber}
@@ -377,18 +366,18 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateTab }) =
           />
         )}
 
-        {/* 5. Dynamic Role Persona Welcome & Duties Banner */}
+        {/* 4. Dynamic Role Persona Welcome & Duties Banner */}
         <RoleWelcomeBanner
           isOptimizing={isOptimizing}
           onQuickAction={handleQuickAction}
         />
 
-        {/* 6. Executive Solution & Impact Analysis Comparison */}
+        {/* 5. Executive Solution & Impact Analysis Comparison */}
         <OptimizationSolutionCard
           onOpenStatutory={() => setShowStatutoryModal(true)}
         />
 
-        {/* 7. Executive 4-Metric Grid */}
+        {/* 6. Executive 4-Metric Grid */}
         <ControlOfficeKpis
           activeBlocksCount={blocks.length > 0 ? blocks.length : 20}
           shadowSavedHours={5.3}
@@ -396,7 +385,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateTab }) =
           criticalityScore={171.6}
         />
 
-        {/* 8. Dual-Swimlane Corridor Space-Time Gantt Chart */}
+        {/* 7. Dual-Swimlane Corridor Space-Time Gantt Chart */}
         <ControlOfficeGantt
           trainMovements={trainMovements}
           blocks={blocks}
@@ -409,7 +398,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateTab }) =
           onOpenInjectTrain={() => setShowInjectTrainModal(true)}
         />
 
-        {/* 9. Middle Grid: Left 50% GIS Track Map + Right 50% What-If Simulator */}
+        {/* 8. Middle Grid: Left 50% GIS Track Map + Right 50% What-If Simulator */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="h-full">
             <GisTrackMap
@@ -431,13 +420,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateTab }) =
           </div>
         </div>
 
-        {/* 10. Bottom Full-Width Table: Predictive Risk & Defect Analysis Engine */}
+        {/* 9. Bottom Full-Width Table: Predictive Risk & Defect Analysis Engine */}
         <AIRiskBacklogTable
           requests={maintenanceRequests}
           onInspectDefect={(req) => setInspectedDefect(req)}
         />
 
-        {/* 11. Official CRIS & RDSO Footer */}
+        {/* 10. Official CRIS & RDSO Footer */}
         <ControlOfficeFooter />
 
         {/* Modals */}
