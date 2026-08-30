@@ -50,12 +50,22 @@ export default function App() {
   }, []);
 
   // Notification system
-  const notify = useCallback((message: string, type: ToastType = 'info') => {
-    const id = toastCounter + 1;
-    setToastCounter(id);
-    setToasts(prev => [...prev, { id, message, type }]);
+  const notify = useCallback((message: unknown, type: ToastType = 'info') => {
+    const id = Date.now() + Math.random();
+    let text = 'An unknown event occurred';
+    if (typeof message === 'string') {
+      text = message;
+    } else if (message instanceof Error) {
+      text = message.message;
+    } else if (message && typeof message === 'object') {
+      const obj = message as Record<string, unknown>;
+      text = String(obj.message ?? obj.detail ?? JSON.stringify(message));
+    } else if (message !== undefined && message !== null) {
+      text = String(message);
+    }
+    setToasts(prev => [...prev, { id, message: text, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
-  }, [toastCounter]);
+  }, []);
 
   // Load sections
   useEffect(() => {
@@ -110,7 +120,7 @@ export default function App() {
     <div style={{ minHeight: '100vh', background: 'var(--ir-gray-bg)' }}>
       {/* Header */}
       <div style={{ background: 'var(--ir-navy)', borderBottom: '3px solid var(--ir-orange)', position: 'sticky', top: 0, zIndex: 100 }}>
-        <div style={{ maxWidth: 1440, margin: '0 auto', padding: '0 10px', display: 'flex', alignItems: 'center', gap: 10, height: 48 }}>
+        <div style={{ width: '100%', padding: '0 16px', display: 'flex', alignItems: 'center', gap: 10, height: 48 }}>
           {/* Logo + Title */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 32, height: 32, background: 'var(--ir-orange)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 14, color: '#fff' }}>IR</div>
@@ -164,7 +174,7 @@ export default function App() {
 
       {/* Tab Navigation */}
       <div className="ir-tabs" style={{ position: 'sticky', top: 48, zIndex: 90 }}>
-        <div style={{ maxWidth: 1440, margin: '0 auto', display: 'flex', width: '100%' }}>
+        <div style={{ width: '100%', padding: '0 16px', display: 'flex' }}>
           {TABS.map(t => (
             <button
               key={t.key}
@@ -190,7 +200,7 @@ export default function App() {
       </div>
 
       {/* Main Content */}
-      <div className="ir-container" style={{ paddingTop: 10, maxWidth: 1440 }}>
+      <div className="ir-container" style={{ paddingTop: 12 }}>
         {/* Error banner if no sections */}
         {!sectionsLoading && sections.length === 0 && (
           <div className="ir-error" style={{ marginBottom: 12 }}>

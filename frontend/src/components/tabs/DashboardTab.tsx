@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import type { Section, TrainMovement, Block, MaintenanceRequest, Train } from '../../api/client';
 import { fetchTrainMovements, fetchBlocks, fetchTrains } from '../../api/client';
+import { MapView } from '../MapView';
 
 interface Props {
   section: Section | null;
@@ -204,6 +205,9 @@ export function DashboardTab({ section, defects, onNotify }: Props) {
           </div>
         </div>
       </div>
+
+      {/* GIS Track Map */}
+      <MapView section={section} defects={defects} blocks={blocks} />
 
       {/* Defects + WebSocket live events */}
       <div className="ir-two-col">
