@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import type { Section, MaintenanceRequest, Block } from '../api/client';
+import { resolveSectionCoords } from '../utils/stationCoords';
 
 interface Props {
   section: Section | null;
@@ -8,16 +9,7 @@ interface Props {
   blocks: Block[];
 }
 
-// Indian Railways section coordinates mapping (lat/lng for start & end stations)
-const SECTION_COORDS: Record<string, { start: [number, number]; end: [number, number]; startName: string; endName: string }> = {
-  'TLY-CAN': { start: [11.7480, 75.4920], end: [11.8745, 75.3704], startName: 'Thalassery (TLY)', endName: 'Kannur (CAN)' },
-  'MAS-AJJ': { start: [13.0827, 80.2707], end: [13.0788, 79.6683], startName: 'Chennai Central (MAS)', endName: 'Arakkonam (AJJ)' },
-  'NDLS-AGC': { start: [28.6139, 77.2090], end: [27.1767, 78.0081], startName: 'New Delhi (NDLS)', endName: 'Agra Cantt (AGC)' },
-  'HWH-KGP': { start: [22.5839, 88.3426], end: [22.3353, 87.3262], startName: 'Howrah (HWH)', endName: 'Kharagpur (KGP)' },
-  'CSMT-KYN': { start: [18.9400, 72.8353], end: [19.2354, 73.1299], startName: 'Mumbai CSMT', endName: 'Kalyan (KYN)' },
-};
-
-const DEFAULT_CENTER: [number, number] = [13.0827, 80.2707]; // Chennai default
+const DEFAULT_CENTER: [number, number] = [13.0827, 80.2707];
 
 const PRIORITY_COLORS: Record<string, string> = {
   CRITICAL: '#c62828',
@@ -67,8 +59,8 @@ export function MapView({ section, defects, blocks }: Props) {
 
     layerGroup.clearLayers();
 
-    const code = section?.section_code ?? 'MAS-AJJ';
-    const coords = SECTION_COORDS[code] ?? SECTION_COORDS['MAS-AJJ'];
+    const code = section?.section_code;
+    const coords = resolveSectionCoords(code);
 
     const [sLat, sLng] = coords.start;
     const [eLat, eLng] = coords.end;
