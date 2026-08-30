@@ -67,8 +67,21 @@ services:
       postgres:
         condition: service_healthy
 
+  # ── React Control Office Visual Dashboard ───────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: railblock-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:
     driver: local
   pgadmin_data:
     driver: local
+

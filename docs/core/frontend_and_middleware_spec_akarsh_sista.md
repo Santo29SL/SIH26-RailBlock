@@ -239,4 +239,21 @@ npm install @tanstack/react-query axios lucide-react leaflet react-leaflet d3 cl
 npm run dev
 ```
 
-The frontend will run on `http://localhost:5173` and connect to the backend on `http://localhost:8000`.
+The frontend runs on `http://localhost:5173` and connects to the backend on `http://localhost:8000`.
+
+---
+
+## 7. Progress Scorecard for Akarsh & Sista (Stage 7)
+
+| Module | Weight | Status | % Done |
+| :--- | :---: | :---: | :---: |
+| **1. Control Office Visual Dashboard & Real-Time KPIs** | 15% | ✅ Complete | **100%** |
+| **2. Dual-Swimlane Gantt Timeline (Trains vs Joint Blocks)** | 15% | ✅ Complete | **100%** |
+| **3. Leaflet Geospatial GIS Track Map & Defect Pins** | 15% | ✅ Complete | **100%** |
+| **4. "What-If" Disruption Simulator & HMAC Commit Modal** | 15% | ✅ Complete | **100%** |
+| **5. Statutory Portals (Form T/351 PN & Form T/D 602 TSLW)** | 15% | ✅ Complete | **100%** |
+| **6. Post-Block TSR Speed Recovery Curve Visualizer** | 10% | ✅ Complete | **100%** |
+| **7. Multi-Horizon Planner (24h / 7d / 30d Batching)** | 5% | ✅ Complete | **100%** |
+| **8. 5-Role RBAC Middleware & WebSocket Telemetry Stream** | 10% | ✅ Complete | **100%** |
+| **TOTAL FRONTEND & MIDDLEWARE COMPLETION** | **100%** | ✅ **COMPLETE** | **100%** |
+
