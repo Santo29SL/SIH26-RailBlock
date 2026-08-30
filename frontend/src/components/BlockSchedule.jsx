@@ -1,164 +1,113 @@
-/**
- * BlockSchedule.jsx — Gantt-style timeline of maintenance blocks.
- * Fetches real block data from the FastAPI backend.
- */
-
 import { useEffect, useState, useCallback } from 'react';
 import { RefreshCw, ChevronLeft, ChevronRight, AlertTriangle, Wifi, WifiOff } from 'lucide-react';
 import { blocksAPI } from '../services/api';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 const STATUS_COLOR = {
-  PROPOSED:  { stroke: '#6366f1', fill: 'rgba(99,102,241,.25)' },
-  APPROVED:  { stroke: '#22d3ee', fill: 'rgba(34,211,238,.25)' },
-  ACTIVE:    { stroke: '#f59e0b', fill: 'rgba(245,158,11,.25)'  },
-  COMPLETED: { stroke: '#10b981', fill: 'rgba(16,185,129,.20)'  },
-  CANCELLED: { stroke: '#6b7280', fill: 'rgba(107,114,128,.15)' },
+  PROPOSED:  { stroke: '#8b5cf6', fill: 'rgba(139,92,246,.2)' },
+  APPROVED:  { stroke: '#22d3ee', fill: 'rgba(34,211,238,.15)' },
+  ACTIVE:    { stroke: '#f59e0b', fill: 'rgba(245,158,11,.2)'  },
+  COMPLETED: { stroke: '#10b981', fill: 'rgba(16,185,129,.15)' },
+  CANCELLED: { stroke: '#6b7280', fill: 'rgba(107,114,128,.1)' },
 };
 
-function timeToMinutes(t) {
+function timeToMin(t) {
   if (!t) return 0;
-  const str = typeof t === 'string' ? t : String(t);
-  const parts = str.split(':').map(Number);
-  return (parts[0] ?? 0) * 60 + (parts[1] ?? 0);
+  const p = String(t).split(':').map(Number);
+  return (p[0] ?? 0) * 60 + (p[1] ?? 0);
 }
 
-function fmtTime(t) {
-  if (!t) return '—';
-  const str = typeof t === 'string' ? t : String(t);
-  return str.slice(0, 5); // HH:MM
-}
+function fmtTime(t) { return t ? String(t).slice(0, 5) : '—'; }
 
-// ── Gantt Row ─────────────────────────────────────────────────────────────────
-function GanttRow({ block, totalMinutes = 1440 }) {
-  const start  = timeToMinutes(block.start_time);
-  const dur    = block.duration_minutes ?? 60;
-  const leftPct  = (start / totalMinutes) * 100;
-  const widthPct = Math.max((dur / totalMinutes) * 100, 0.5);
-  const colors   = STATUS_COLOR[block.status] ?? STATUS_COLOR.PROPOSED;
-
+function GanttRow({ block }) {
   const [hovered, setHovered] = useState(false);
+  const start  = timeToMin(block.start_time);
+  const dur    = block.duration_minutes ?? 60;
+  const leftPct  = (start / 1440) * 100;
+  const widthPct = Math.max((dur / 1440) * 100, 0.5);
+  const c = STATUS_COLOR[block.status] ?? STATUS_COLOR.PROPOSED;
 
   return (
-    <div
-      style={{ position: 'relative', height: '48px', display: 'flex', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,.04)' }}
-    >
-      {/* Section label */}
+    <div style={{
+      position: 'relative', height: 44,
+      display: 'flex', alignItems: 'center',
+      borderBottom: '1px solid var(--border)',
+    }}>
       <div style={{
-        width: '140px', flexShrink: 0, padding: '0 14px',
-        fontSize: '11px', color: 'rgba(255,255,255,.45)',
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        width: 140, flexShrink: 0, padding: '0 14px',
+        fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-3)',
+        letterSpacing: '.04em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
       }}>
         {block.block_code}
       </div>
-
-      {/* Timeline track */}
       <div style={{ flex: 1, position: 'relative', height: '100%', display: 'flex', alignItems: 'center' }}>
-        {/* Hour grid lines */}
+        {/* Hour grid */}
         {Array.from({ length: 25 }, (_, h) => (
           <div key={h} style={{
             position: 'absolute', left: `${(h / 24) * 100}%`,
             top: 0, bottom: 0,
-            borderLeft: '1px solid rgba(255,255,255,.05)',
+            borderLeft: `1px solid ${h % 6 === 0 ? 'rgba(255 255 255 / .08)' : 'rgba(255 255 255 / .03)'}`,
           }} />
         ))}
-
         {/* Block bar */}
         <div
-          style={{
-            position: 'absolute',
-            left: `${leftPct}%`,
-            width: `${widthPct}%`,
-            height: '60%',
-            background: colors.fill,
-            border: `1.5px solid ${colors.stroke}`,
-            borderRadius: '4px',
-            cursor: 'pointer',
-            transition: 'height .15s, filter .15s',
-            filter: hovered ? 'brightness(1.3)' : 'none',
-            display: 'flex', alignItems: 'center', overflow: 'hidden',
-            paddingLeft: '5px',
-            minWidth: '6px',
-          }}
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
-          title={`${block.block_code} | ${fmtTime(block.start_time)}–${fmtTime(block.end_time)} | ${block.duration_minutes} min | ${block.status}`}
+          title={`${block.block_code} · ${fmtTime(block.start_time)} – ${dur} min · ${block.status}`}
+          style={{
+            position: 'absolute',
+            left: `${leftPct}%`, width: `${widthPct}%`,
+            height: '55%',
+            background: hovered ? c.stroke + '55' : c.fill,
+            border: `1.5px solid ${c.stroke}`,
+            borderRadius: 2,
+            cursor: 'pointer',
+            transition: 'background .15s',
+            display: 'flex', alignItems: 'center',
+            overflow: 'hidden', paddingLeft: 5,
+          }}
         >
-          {widthPct > 5 && (
-            <span style={{ fontSize: '10px', color: colors.stroke, fontWeight: 600, whiteSpace: 'nowrap', letterSpacing: '.03em' }}>
-              {fmtTime(block.start_time)}
-            </span>
-          )}
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: c.stroke, letterSpacing: '.04em', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+            {block.block_code} · {fmtTime(block.start_time)}
+          </span>
         </div>
-      </div>
-
-      {/* Duration label */}
-      <div style={{ width: '70px', flexShrink: 0, textAlign: 'right', paddingRight: '14px', fontSize: '11px', color: 'rgba(255,255,255,.3)' }}>
-        {block.duration_minutes} min
-      </div>
-    </div>
-  );
-}
-
-// ── Hour ruler ────────────────────────────────────────────────────────────────
-function HourRuler() {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,.08)', height: '32px' }}>
-      <div style={{ width: '140px', flexShrink: 0 }} />
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        {Array.from({ length: 25 }, (_, h) => (
-          <div key={h} style={{
-            position: 'absolute', left: `${(h / 24) * 100}%`,
-            fontSize: '10px', color: 'rgba(255,255,255,.25)', transform: 'translateX(-50%)',
-            userSelect: 'none',
+        {hovered && (
+          <div style={{
+            position: 'absolute', left: `${leftPct}%`, top: '50%',
+            transform: 'translateY(-110%)',
+            background: 'var(--surface-3)', border: `1px solid ${c.stroke}`,
+            borderRadius: 'var(--r2)', padding: '8px 12px', zIndex: 10, minWidth: 160,
+            pointerEvents: 'none',
           }}>
-            {h === 0 ? '00:00' : h % 6 === 0 ? `${String(h).padStart(2, '0')}:00` : h % 3 === 0 ? '|' : ''}
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{block.block_code}</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-2)', lineHeight: 1.8 }}>
+              <div>Start: {fmtTime(block.start_time)}</div>
+              <div>Duration: {dur} min</div>
+              <div style={{ color: c.stroke }}>Status: {block.status}</div>
+            </div>
           </div>
-        ))}
+        )}
       </div>
-      <div style={{ width: '70px', flexShrink: 0 }} />
     </div>
   );
 }
 
-// ── Legend ────────────────────────────────────────────────────────────────────
-function Legend() {
-  return (
-    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-      {Object.entries(STATUS_COLOR).map(([status, { stroke }]) => (
-        <div key={status} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'rgba(255,255,255,.5)' }}>
-          <div style={{ width: 12, height: 12, borderRadius: '3px', background: stroke + '40', border: `1.5px solid ${stroke}` }} />
-          {status.charAt(0) + status.slice(1).toLowerCase()}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ── Main Component ─────────────────────────────────────────────────────────────
 export default function BlockSchedule() {
   const [blocks, setBlocks]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
   const [online, setOnline]   = useState(true);
-  const [date, setDate]       = useState(() => new Date().toISOString().slice(0, 10));
-  const [statusFilter, setStatus] = useState('');
-  const [page, setPage]       = useState(1);
-  const [total, setTotal]     = useState(0);
-  const PAGE_SIZE = 30;
+  const [dateOffset, setDateOffset] = useState(0);
 
-  const fetchBlocks = useCallback(async () => {
+  const targetDate = new Date();
+  targetDate.setDate(targetDate.getDate() + dateOffset);
+  const dateStr = targetDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await blocksAPI.list({
-        page,
-        pageSize: PAGE_SIZE,
-        status: statusFilter || undefined,
-      });
-      const data = res.data;
-      setBlocks(data.items ?? []);
-      setTotal(data.total ?? 0);
+      const res = await blocksAPI.list({ pageSize: 100 });
+      setBlocks(res.data.items ?? []);
       setOnline(true);
     } catch (err) {
       setError(err?.response?.data?.detail ?? err.message ?? 'Backend unreachable');
@@ -166,137 +115,83 @@ export default function BlockSchedule() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter]);
+  }, []);
 
-  useEffect(() => { fetchBlocks(); }, [fetchBlocks]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const hours = Array.from({ length: 25 }, (_, i) => i);
 
   return (
-    <div style={{ padding: '28px 32px', maxWidth: '1200px' }}>
+    <div style={{ padding: '28px 32px', maxWidth: 1200 }}>
 
-      {/* ── Header ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-        <div>
-          <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: '26px', margin: 0, fontWeight: 600 }}>
-            Block Schedule
-          </h1>
-          <p style={{ margin: '6px 0 0', color: 'rgba(255,255,255,.4)', fontSize: '13px' }}>
-            Gantt-style maintenance block timeline · {total} blocks total
-          </p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          {/* Online indicator */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: online ? '#10b981' : '#ef4444' }}>
-            {online ? <Wifi size={13} /> : <WifiOff size={13} />}
-            {online ? 'Live' : 'Offline'}
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <button onClick={() => setDateOffset(d => d - 1)} style={{ background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 'var(--r1)', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-2)' }}>
+            <ChevronLeft size={14} />
+          </button>
+          <div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 600 }}>{dateStr}</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>{blocks.length} blocks scheduled</div>
           </div>
-
-          {/* Status filter */}
-          <select
-            id="schedule-status-filter"
-            value={statusFilter}
-            onChange={e => { setStatus(e.target.value); setPage(1); }}
-            style={{
-              background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.12)',
-              borderRadius: '8px', color: '#fff', padding: '7px 12px',
-              fontSize: '13px', cursor: 'pointer', outline: 'none',
-            }}
-          >
-            <option value="">All statuses</option>
-            <option value="PROPOSED">Proposed</option>
-            <option value="APPROVED">Approved</option>
-            <option value="ACTIVE">Active</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="CANCELLED">Cancelled</option>
-          </select>
-
-          {/* Refresh */}
-          <button
-            id="schedule-refresh-btn"
-            onClick={fetchBlocks}
-            disabled={loading}
-            style={{
-              background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.12)',
-              borderRadius: '8px', color: '#fff', cursor: loading ? 'not-allowed' : 'pointer',
-              padding: '7px 14px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '7px',
-              opacity: loading ? .5 : 1,
-            }}
-          >
-            <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-            Refresh
+          <button onClick={() => setDateOffset(d => d + 1)} style={{ background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 'var(--r1)', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-2)' }}>
+            <ChevronRight size={14} />
+          </button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 11, color: online ? 'var(--green)' : 'var(--red)' }}>
+            {online ? <Wifi size={11} /> : <WifiOff size={11} />}
+            {online ? 'LIVE' : 'OFFLINE'}
+          </div>
+          <button onClick={fetchData} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 'var(--r1)', color: 'var(--text-2)', cursor: loading ? 'not-allowed' : 'pointer', padding: '6px 12px', fontSize: 11, fontFamily: 'var(--font-mono)', letterSpacing: '.04em', opacity: loading ? .5 : 1 }}>
+            <RefreshCw size={11} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} /> REFRESH
           </button>
         </div>
       </div>
 
-      {/* ── Error ── */}
       {error && (
-        <div style={{
-          background: 'rgba(239,68,68,.12)', border: '1px solid rgba(239,68,68,.3)',
-          borderRadius: '10px', padding: '12px 16px', marginBottom: '20px',
-          display: 'flex', alignItems: 'center', gap: '10px', color: '#fca5a5', fontSize: '13px',
-        }}>
-          <AlertTriangle size={16} />
-          <strong>Backend error:</strong> {error}
+        <div style={{ background: 'var(--red-dim)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 'var(--r2)', padding: '10px 14px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 8, color: '#fca5a5', fontSize: 12, fontFamily: 'var(--font-mono)' }}>
+          <AlertTriangle size={12} /> {error}
         </div>
       )}
 
-      {/* ── Legend ── */}
-      <div style={{ marginBottom: '16px' }}><Legend /></div>
+      {/* Legend */}
+      <div style={{ display: 'flex', gap: 16, marginBottom: 18 }}>
+        {Object.entries(STATUS_COLOR).map(([status, { stroke }]) => (
+          <div key={status} style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-3)' }}>
+            <span style={{ width: 10, height: 3, borderRadius: 2, background: stroke }} />
+            {status}
+          </div>
+        ))}
+      </div>
 
-      {/* ── Gantt chart ── */}
-      <div style={{
-        background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.08)',
-        borderRadius: '12px', overflow: 'hidden',
-      }}>
-        <HourRuler />
-
-        {loading
-          ? <div style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,.3)', fontSize: '14px' }}>
-              Loading blocks…
-            </div>
-          : blocks.length === 0
-            ? <div style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,.3)', fontSize: '14px' }}>
-                No blocks found{statusFilter ? ` with status "${statusFilter}"` : ''}. Seed data or run the optimizer to populate.
+      {/* Gantt */}
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', overflow: 'hidden' }}>
+        {/* Hour ruler */}
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--border-2)', background: 'var(--surface-2)' }}>
+          <div style={{ width: 140, flexShrink: 0, padding: '8px 14px', fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-3)', letterSpacing: '.08em' }}>SECTION</div>
+          <div style={{ flex: 1, position: 'relative', height: 32 }}>
+            {hours.map(h => (
+              <div key={h} style={{
+                position: 'absolute', left: `${(h / 24) * 100}%`,
+                top: 0, bottom: 0, display: 'flex', alignItems: 'center',
+              }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: h % 6 === 0 ? 'var(--text-2)' : 'var(--text-3)', letterSpacing: '.04em', transform: 'translateX(-50%)' }}>
+                  {String(h).padStart(2, '0')}:00
+                </span>
               </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Rows */}
+        {loading
+          ? <div style={{ padding: 32, textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-3)' }}>Loading schedule…</div>
+          : blocks.length === 0
+            ? <div style={{ padding: 32, textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-3)' }}>No blocks found for this date</div>
             : blocks.map(b => <GanttRow key={b.id} block={b} />)
         }
       </div>
-
-      {/* ── Pagination ── */}
-      {totalPages > 1 && (
-        <div style={{
-          display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px',
-          marginTop: '20px', fontSize: '13px', color: 'rgba(255,255,255,.5)',
-        }}>
-          <button
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page === 1 || loading}
-            style={{
-              background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.12)',
-              borderRadius: '8px', color: '#fff', cursor: page === 1 ? 'not-allowed' : 'pointer',
-              padding: '6px 10px', display: 'flex', alignItems: 'center',
-              opacity: page === 1 ? .4 : 1,
-            }}
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <span>Page {page} of {totalPages} · {total} blocks</span>
-          <button
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages || loading}
-            style={{
-              background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.12)',
-              borderRadius: '8px', color: '#fff', cursor: page === totalPages ? 'not-allowed' : 'pointer',
-              padding: '6px 10px', display: 'flex', alignItems: 'center',
-              opacity: page === totalPages ? .4 : 1,
-            }}
-          >
-            <ChevronRight size={16} />
-          </button>
-        </div>
-      )}
-
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );

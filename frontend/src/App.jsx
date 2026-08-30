@@ -1,76 +1,151 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Activity, Map, Calendar, Settings } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Activity, Map, Calendar, Zap, AlertTriangle } from 'lucide-react';
 import NetworkMap from './components/NetworkMap';
 import LandingPage from './components/LandingPage';
 import Dashboard from './components/Dashboard';
 import BlockSchedule from './components/BlockSchedule';
 
-/* ── App shell (sidebar + routes) used at /dashboard, /map, /schedule ── */
-function AppShell() {
-  const location = useLocation();
+const navItems = [
+  { to: '/dashboard', icon: Activity, label: 'Command' },
+  { to: '/map',       icon: Map,      label: 'Network' },
+  { to: '/schedule',  icon: Calendar,  label: 'Schedule' },
+];
 
-  const navItems = [
-    { to: '/dashboard', icon: <Activity size={18} />, label: 'Dashboard' },
-    { to: '/map',       icon: <Map size={18} />,      label: 'Network Map' },
-    { to: '/schedule',  icon: <Calendar size={18} />,  label: 'Block Schedule' },
-  ];
-
+function Sidebar() {
+  const { pathname } = useLocation();
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: 'var(--font-body)', color: 'var(--color-text)', background: 'var(--color-bg)' }}>
+    <aside style={{
+      width: 220, flexShrink: 0,
+      display: 'flex', flexDirection: 'column',
+      background: 'var(--bg-2)',
+      borderRight: '1px solid var(--border)',
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      {/* Track texture strip */}
+      <div style={{
+        position: 'absolute', left: 0, top: 0, bottom: 0, width: 3,
+        background: 'repeating-linear-gradient(to bottom, var(--amber) 0px, var(--amber) 6px, transparent 6px, transparent 18px)',
+        opacity: .35,
+      }} />
 
-      {/* ── Sidebar ── */}
-      <aside style={{
-        width: '224px', flexShrink: 0, display: 'flex', flexDirection: 'column',
-        background: 'var(--color-accent-900)', color: 'var(--color-neutral-100)',
-        borderRight: '1px solid color-mix(in srgb,#fff 14%,transparent)',
+      {/* Logo */}
+      <Link to="/" style={{
+        padding: '20px 20px 18px 24px',
+        display: 'flex', alignItems: 'center', gap: 10,
+        textDecoration: 'none',
+        borderBottom: '1px solid var(--border)',
       }}>
-        <Link to="/" style={{
-          padding: '22px 24px 18px', fontFamily: 'var(--font-heading)',
-          fontSize: '20px', letterSpacing: '.04em', color: 'inherit',
-          textDecoration: 'none', borderBottom: '1px solid color-mix(in srgb,#fff 12%,transparent)',
+        <div style={{
+          width: 32, height: 32, borderRadius: 2,
+          background: 'var(--amber)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
         }}>
-          🚆 RailBlock AI
-        </Link>
-
-        <nav style={{ flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {navItems.map(({ to, icon, label }) => {
-            const active = location.pathname === to;
-            return (
-              <Link key={to} to={to} style={{
-                display: 'flex', alignItems: 'center', gap: '10px',
-                padding: '9px 14px', textDecoration: 'none', fontSize: '14px',
-                color: active ? 'var(--color-accent-300)' : 'color-mix(in srgb,var(--color-neutral-100) 80%,transparent)',
-                background: active ? 'color-mix(in srgb,var(--color-accent) 18%,transparent)' : 'transparent',
-                borderLeft: active ? '2px solid var(--color-accent-400)' : '2px solid transparent',
-                transition: 'background .15s, color .15s',
-              }}>
-                {icon}<span>{label}</span>
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div style={{ padding: '14px 24px', borderTop: '1px solid color-mix(in srgb,#fff 12%,transparent)', fontSize: '11px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'color-mix(in srgb,var(--color-neutral-100) 45%,transparent)' }}>
-          NR · Delhi Division
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M2 9H16M2 5H16M2 13H16" stroke="#05070d" strokeWidth="2" strokeLinecap="round"/>
+            <circle cx="6" cy="9" r="2" fill="#05070d"/>
+            <circle cx="12" cy="5" r="2" fill="#05070d"/>
+            <circle cx="9" cy="13" r="2" fill="#05070d"/>
+          </svg>
         </div>
-      </aside>
+        <div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, letterSpacing: '.06em', color: 'var(--text)', lineHeight: 1.1 }}>RAILBLOCK</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.12em', color: 'var(--text-3)', textTransform: 'uppercase' }}>AI · NR Delhi Div</div>
+        </div>
+      </Link>
 
-      {/* ── Main ── */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <header style={{
-          padding: '14px 28px', background: 'var(--color-bg)',
-          borderBottom: '1px solid var(--color-divider)',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        }}>
-          <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '18px', margin: 0, fontWeight: 400, letterSpacing: '.02em' }}>
-            Automatic Block Planning System
-          </h2>
-          <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', opacity: .6, padding: '4px' }}>
-            <Settings size={18} />
-          </button>
-        </header>
+      {/* Nav */}
+      <nav style={{ flex: 1, padding: '10px 10px' }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.14em', color: 'var(--text-3)', padding: '8px 12px 6px', textTransform: 'uppercase' }}>Control</div>
+        {navItems.map(({ to, icon: Icon, label }) => {
+          const active = pathname === to;
+          return (
+            <Link key={to} to={to} style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '9px 12px', marginBottom: 2,
+              textDecoration: 'none', fontSize: 13,
+              fontFamily: 'var(--font-body)',
+              fontWeight: active ? 500 : 400,
+              color: active ? 'var(--amber)' : 'var(--text-2)',
+              background: active ? 'rgba(245 158 11 / .1)' : 'transparent',
+              borderLeft: `2px solid ${active ? 'var(--amber)' : 'transparent'}`,
+              borderRadius: '0 var(--r1) var(--r1) 0',
+              transition: 'all .15s',
+            }}>
+              <Icon size={15} style={{ flexShrink: 0 }} />
+              {label}
+            </Link>
+          );
+        })}
+      </nav>
 
+      {/* Footer status */}
+      <div style={{
+        padding: '12px 14px 14px',
+        borderTop: '1px solid var(--border)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+          <span className="signal-dot amber" style={{ width: 6, height: 6 }} />
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '.1em', color: 'var(--text-3)', textTransform: 'uppercase' }}>System Active</span>
+        </div>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-3)', letterSpacing: '.06em', lineHeight: 1.7 }}>
+          <div>NDLS–GZB · 46.2 km</div>
+          <div>4 UP / DN lines</div>
+          <div>PS 26027 · SIH 2026</div>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function AppHeader() {
+  const { pathname } = useLocation();
+  const titles = {
+    '/dashboard': { label: 'Command Dashboard', sub: 'Live block planning metrics' },
+    '/map':       { label: 'Network Map',        sub: 'Section defects & GIS overlay' },
+    '/schedule':  { label: 'Block Schedule',      sub: 'Gantt timeline · weekly view' },
+  };
+  const { label, sub } = titles[pathname] ?? { label: 'RailBlock', sub: '' };
+  return (
+    <header style={{
+      padding: '12px 28px',
+      background: 'var(--bg)',
+      borderBottom: '1px solid var(--border)',
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      flexShrink: 0,
+    }}>
+      <div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 600, letterSpacing: '.04em', lineHeight: 1 }}>{label}</div>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-3)', marginTop: 3, letterSpacing: '.04em' }}>{sub}</div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-3)' }}>
+          <Zap size={11} style={{ color: 'var(--amber)' }} />
+          BDMS · READ-ONLY
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-3)' }}>
+          <AlertTriangle size={11} style={{ color: 'var(--orange)' }} />
+          G&amp;SR ENFORCED
+        </div>
+        <div style={{
+          width: 28, height: 28, borderRadius: '50%',
+          background: 'var(--amber)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center',
+          fontFamily: 'var(--font-display)', fontWeight: 700,
+          fontSize: 12, color: '#05070d',
+        }}>SC</div>
+      </div>
+    </header>
+  );
+}
+
+function AppShell() {
+  return (
+    <div style={{ display: 'flex', height: '100vh', background: 'var(--bg)' }}>
+      <Sidebar />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+        <AppHeader />
         <div style={{ flex: 1, overflowY: 'auto' }}>
           <Routes>
             <Route path="/dashboard" element={<Dashboard />} />
@@ -78,12 +153,11 @@ function AppShell() {
             <Route path="/schedule"  element={<BlockSchedule />} />
           </Routes>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
 
-/* ── Root ── */
 export default function App() {
   return (
     <Router>

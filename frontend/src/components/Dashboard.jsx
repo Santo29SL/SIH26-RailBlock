@@ -1,19 +1,13 @@
-/**
- * Dashboard.jsx — Live Command Dashboard
- * Pulls real data from the FastAPI backend via the API service layer.
- */
-
 import { useEffect, useState, useCallback } from 'react';
-import { Activity, AlertTriangle, CheckCircle2, Clock, RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle2, Clock, RefreshCw, Wifi, WifiOff, Zap, TrendingUp } from 'lucide-react';
 import { blocksAPI, maintenanceAPI } from '../services/api';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 const STATUS_META = {
-  PROPOSED:  { color: '#6366f1', bg: 'rgba(99,102,241,.15)',  label: 'Proposed' },
-  APPROVED:  { color: '#22d3ee', bg: 'rgba(34,211,238,.15)',  label: 'Approved' },
-  ACTIVE:    { color: '#f59e0b', bg: 'rgba(245,158,11,.15)',  label: 'Active'   },
-  COMPLETED: { color: '#10b981', bg: 'rgba(16,185,129,.15)',  label: 'Done'     },
-  CANCELLED: { color: '#6b7280', bg: 'rgba(107,114,128,.12)', label: 'Cancelled'},
+  PROPOSED:  { color: '#8b5cf6', bg: 'rgba(139,92,246,.12)',  label: 'Proposed',  dot: '#8b5cf6' },
+  APPROVED:  { color: '#22d3ee', bg: 'rgba(34,211,238,.12)',  label: 'Approved',  dot: '#22d3ee' },
+  ACTIVE:    { color: '#f59e0b', bg: 'rgba(245,158,11,.12)',  label: 'Active',    dot: '#f59e0b' },
+  COMPLETED: { color: '#10b981', bg: 'rgba(16,185,129,.12)',  label: 'Done',      dot: '#10b981' },
+  CANCELLED: { color: '#6b7280', bg: 'rgba(107,114,128,.1)', label: 'Cancelled', dot: '#6b7280' },
 };
 
 const DEPT_COLOR = {
@@ -28,55 +22,56 @@ function StatusBadge({ status }) {
   const m = STATUS_META[status] ?? STATUS_META.PROPOSED;
   return (
     <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: '5px',
-      padding: '3px 10px', borderRadius: '20px',
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      padding: '2px 9px', borderRadius: 20,
       background: m.bg, color: m.color,
-      fontSize: '11px', fontWeight: 600, letterSpacing: '.04em',
-      border: `1px solid ${m.color}33`,
+      fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 500, letterSpacing: '.05em',
+      border: `1px solid ${m.color}30`,
     }}>
-      <span style={{ width: 6, height: 6, borderRadius: '50%', background: m.color, flexShrink: 0 }} />
+      <span style={{ width: 5, height: 5, borderRadius: '50%', background: m.dot, flexShrink: 0 }} />
       {m.label}
     </span>
   );
 }
 
-function StatCard({ icon: Icon, label, value, sub, color = 'var(--color-accent)' }) {
+function StatCard({ icon: Icon, label, value, sub, color = 'var(--amber)' }) {
   return (
     <div style={{
-      background: 'rgba(255,255,255,.03)',
-      border: '1px solid rgba(255,255,255,.08)',
-      borderRadius: '12px',
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--r2)',
       padding: '20px 22px',
-      display: 'flex', flexDirection: 'column', gap: '8px',
-      transition: 'border-color .2s, background .2s',
+      display: 'flex', flexDirection: 'column', gap: 10,
+      transition: 'border-color .2s',
+      position: 'relative', overflow: 'hidden',
     }}
-    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,.06)'; e.currentTarget.style.borderColor = color + '55'; }}
-    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,.03)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,.08)'; }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = color + '55'; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      {/* top-right accent bar */}
+      <div style={{ position: 'absolute', top: 0, right: 0, width: 3, height: '100%', background: color, opacity: .3 }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{
-          width: 36, height: 36, borderRadius: '8px',
-          background: color + '1a', display: 'flex',
-          alignItems: 'center', justifyContent: 'center',
+          width: 34, height: 34, borderRadius: 'var(--r2)',
+          background: color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <Icon size={18} color={color} />
+          <Icon size={16} color={color} />
         </div>
-        <span style={{ fontSize: '12px', color: 'rgba(255,255,255,.5)', letterSpacing: '.05em', textTransform: 'uppercase' }}>{label}</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-3)', letterSpacing: '.1em', textTransform: 'uppercase' }}>{label}</span>
       </div>
-      <div style={{ fontSize: '32px', fontWeight: 700, color: '#fff', lineHeight: 1 }}>{value ?? '—'}</div>
-      {sub && <div style={{ fontSize: '12px', color: 'rgba(255,255,255,.4)' }}>{sub}</div>}
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: 40, fontWeight: 700, color: 'var(--text)', lineHeight: 1 }}>{value ?? '—'}</div>
+      {sub && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-3)', lineHeight: 1.6 }}>{sub}</div>}
     </div>
   );
 }
 
-// ── Main Component ─────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const [blocks, setBlocks]       = useState([]);
-  const [maintenance, setMaint]   = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState(null);
-  const [lastUpdated, setLast]    = useState(null);
-  const [online, setOnline]       = useState(true);
+  const [blocks, setBlocks]     = useState([]);
+  const [maintenance, setMaint] = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState(null);
+  const [lastUpdated, setLast]  = useState(null);
+  const [online, setOnline]     = useState(true);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -91,7 +86,6 @@ export default function Dashboard() {
       setLast(new Date());
       setOnline(true);
     } catch (err) {
-      console.error('[Dashboard] fetch error:', err);
       setError(err?.response?.data?.detail ?? err.message ?? 'Backend unreachable');
       setOnline(false);
     } finally {
@@ -101,124 +95,105 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30_000); // auto-refresh every 30s
-    return () => clearInterval(interval);
+    const id = setInterval(fetchData, 30_000);
+    return () => clearInterval(id);
   }, [fetchData]);
 
-  // ── Derived stats ──────────────────────────────────────────────────────────
-  const blocksByStatus = blocks.reduce((acc, b) => {
-    acc[b.status] = (acc[b.status] ?? 0) + 1;
-    return acc;
-  }, {});
-
-  const pendingMaint = maintenance.filter(m => m.status === 'PENDING').length;
-  const criticalMaint = maintenance.filter(m => m.priority === 'CRITICAL' && m.status !== 'COMPLETED').length;
-
-  // Dept breakdown for pending maintenance
-  const deptCounts = maintenance.reduce((acc, m) => {
-    if (m.status !== 'COMPLETED') {
-      acc[m.department] = (acc[m.department] ?? 0) + 1;
-    }
-    return acc;
-  }, {});
+  const byStatus    = blocks.reduce((a, b) => { a[b.status] = (a[b.status] ?? 0) + 1; return a; }, {});
+  const pendingMaint   = maintenance.filter(m => m.status === 'PENDING').length;
+  const criticalMaint  = maintenance.filter(m => m.priority === 'CRITICAL' && m.status !== 'COMPLETED').length;
+  const deptCounts     = maintenance.reduce((a, m) => { if (m.status !== 'COMPLETED') { a[m.department] = (a[m.department] ?? 0) + 1; } return a; }, {});
 
   return (
-    <div style={{ padding: '28px 32px', maxWidth: '1200px' }}>
+    <div style={{ padding: '28px 32px', maxWidth: 1200 }}>
 
-      {/* ── Header ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
         <div>
-          <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: '26px', margin: 0, fontWeight: 600 }}>
-            Command Dashboard
-          </h1>
-          <p style={{ margin: '6px 0 0', color: 'rgba(255,255,255,.4)', fontSize: '13px' }}>
-            Live railway block planning metrics · Auto-refreshes every 30 s
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontFamily: 'var(--font-mono)', fontSize: 10, color: online ? 'var(--green)' : 'var(--red)', letterSpacing: '.06em' }}>
+              {online ? <Wifi size={11} /> : <WifiOff size={11} />}
+              {online ? 'BACKEND CONNECTED' : 'BACKEND OFFLINE'}
+            </span>
+            {lastUpdated && (
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-3)' }}>
+                · {lastUpdated.toLocaleTimeString()}
+              </span>
+            )}
+          </div>
+          <p style={{ margin: 0, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-3)' }}>
+            Auto-refreshes every 30s · NDLS–GZB corridor · NR Delhi Division
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* Online indicator */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: online ? '#10b981' : '#ef4444' }}>
-            {online ? <Wifi size={14} /> : <WifiOff size={14} />}
-            {online ? 'Backend connected' : 'Backend offline'}
-          </div>
-          <button
-            id="dashboard-refresh-btn"
-            onClick={fetchData}
-            disabled={loading}
-            style={{
-              background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.12)',
-              borderRadius: '8px', color: '#fff', cursor: loading ? 'not-allowed' : 'pointer',
-              padding: '7px 14px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '7px',
-              opacity: loading ? .5 : 1, transition: 'opacity .2s, background .2s',
-            }}
-            onMouseEnter={e => { if (!loading) e.currentTarget.style.background = 'rgba(255,255,255,.12)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,.07)'; }}
-          >
-            <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-            Refresh
-          </button>
-        </div>
+        <button
+          onClick={fetchData}
+          disabled={loading}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 7,
+            background: 'var(--surface)', border: '1px solid var(--border-2)',
+            borderRadius: 'var(--r1)', color: 'var(--text-2)', cursor: loading ? 'not-allowed' : 'pointer',
+            padding: '7px 14px', fontSize: 12, fontFamily: 'var(--font-mono)',
+            letterSpacing: '.04em',
+            opacity: loading ? .5 : 1, transition: 'all .15s',
+          }}
+          onMouseEnter={e => { if (!loading) { e.currentTarget.style.background = 'var(--surface-2)'; e.currentTarget.style.color = 'var(--text)'; }}}
+          onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface)'; e.currentTarget.style.color = 'var(--text-2)'; }}
+        >
+          <RefreshCw size={12} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+          REFRESH
+        </button>
       </div>
 
-      {/* ── Error banner ── */}
+      {/* Error */}
       {error && (
         <div style={{
-          background: 'rgba(239,68,68,.12)', border: '1px solid rgba(239,68,68,.3)',
-          borderRadius: '10px', padding: '12px 16px', marginBottom: '24px',
-          display: 'flex', alignItems: 'center', gap: '10px', color: '#fca5a5', fontSize: '13px',
+          background: 'var(--red-dim)', border: '1px solid rgba(239,68,68,.3)',
+          borderRadius: 'var(--r2)', padding: '12px 16px', marginBottom: 24,
+          display: 'flex', alignItems: 'center', gap: 10,
+          color: '#fca5a5', fontSize: 13, fontFamily: 'var(--font-mono)',
         }}>
-          <AlertTriangle size={16} />
+          <AlertTriangle size={14} />
           <strong>Backend error:</strong> {error}
-          <span style={{ color: 'rgba(255,255,255,.35)', fontSize: '11px', marginLeft: 'auto' }}>
-            Make sure the FastAPI server is running on port 8000
-          </span>
+          <span style={{ color: 'var(--text-3)', fontSize: 10, marginLeft: 'auto' }}>Make sure FastAPI is running on port 8000</span>
         </div>
       )}
 
-      {/* ── Stat cards ── */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-        gap: '16px',
-        marginBottom: '32px',
-      }}>
-        <StatCard icon={Activity} label="Total Blocks"   value={blocks.length}               color="#6366f1" />
-        <StatCard icon={Clock}    label="Active Blocks"  value={blocksByStatus.ACTIVE ?? 0}  color="#f59e0b"
-          sub={`${blocksByStatus.PROPOSED ?? 0} proposed · ${blocksByStatus.APPROVED ?? 0} approved`} />
-        <StatCard icon={CheckCircle2} label="Completed" value={blocksByStatus.COMPLETED ?? 0} color="#10b981"
-          sub={`${blocksByStatus.CANCELLED ?? 0} cancelled`} />
-        <StatCard icon={AlertTriangle} label="Critical Requests" value={criticalMaint} color="#ef4444"
+      {/* Stat cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(210px,1fr))', gap: 16, marginBottom: 28 }}>
+        <StatCard icon={Activity}      label="Total Blocks"      value={blocks.length}               color="var(--violet)" />
+        <StatCard icon={Clock}         label="Active Blocks"     value={byStatus.ACTIVE ?? 0}        color="var(--amber)"
+          sub={`${byStatus.PROPOSED ?? 0} proposed · ${byStatus.APPROVED ?? 0} approved`} />
+        <StatCard icon={CheckCircle2}  label="Completed"         value={byStatus.COMPLETED ?? 0}     color="var(--green)"
+          sub={`${byStatus.CANCELLED ?? 0} cancelled`} />
+        <StatCard icon={AlertTriangle} label="Critical Requests" value={criticalMaint}               color="var(--red)"
           sub={`${pendingMaint} pending total`} />
       </div>
 
-      {/* ── Two-column layout ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+      {/* Two-col */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
 
-        {/* Recent Blocks */}
-        <section style={{
-          background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.08)',
-          borderRadius: '12px', overflow: 'hidden',
-        }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,.07)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontWeight: 600, fontSize: '14px' }}>Recent Blocks</span>
-            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,.35)' }}>{blocks.length} total</span>
+        {/* Recent blocks */}
+        <section style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', overflow: 'hidden' }}>
+          <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 600 }}>Recent Blocks</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-3)' }}>{blocks.length} TOTAL</span>
           </div>
-          <div style={{ padding: '8px 0', maxHeight: '320px', overflowY: 'auto' }}>
+          <div style={{ maxHeight: 340, overflowY: 'auto' }}>
             {loading
-              ? <div style={{ padding: '24px', textAlign: 'center', color: 'rgba(255,255,255,.3)', fontSize: '13px' }}>Loading…</div>
+              ? <div style={{ padding: 28, textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-3)' }}>Loading…</div>
               : blocks.length === 0
-                ? <div style={{ padding: '24px', textAlign: 'center', color: 'rgba(255,255,255,.3)', fontSize: '13px' }}>No blocks found</div>
-                : blocks.slice(0, 12).map(b => (
+                ? <div style={{ padding: 28, textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-3)' }}>No blocks found</div>
+                : blocks.slice(0, 14).map(b => (
                   <div key={b.id} style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '10px 20px', borderBottom: '1px solid rgba(255,255,255,.04)',
-                    fontSize: '13px', gap: '12px',
+                    padding: '9px 20px', borderBottom: '1px solid var(--border)',
+                    gap: 12,
                   }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, color: '#e2e8f0', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 14, color: 'var(--text)', marginBottom: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {b.block_code}
                       </div>
-                      <div style={{ color: 'rgba(255,255,255,.35)', fontSize: '11px' }}>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-3)' }}>
                         {b.block_date} · {b.duration_minutes} min
                       </div>
                     </div>
@@ -229,56 +204,45 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* Department breakdown */}
-        <section style={{
-          background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.08)',
-          borderRadius: '12px', overflow: 'hidden',
-        }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,.07)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontWeight: 600, fontSize: '14px' }}>Open Work by Department</span>
-            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,.35)' }}>{maintenance.length} requests</span>
+        {/* Dept breakdown */}
+        <section style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', overflow: 'hidden' }}>
+          <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 600 }}>Open Work by Department</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-3)' }}>{maintenance.length} REQUESTS</span>
           </div>
-          <div style={{ padding: '20px' }}>
+          <div style={{ padding: '20px 20px' }}>
             {loading
-              ? <div style={{ textAlign: 'center', color: 'rgba(255,255,255,.3)', fontSize: '13px' }}>Loading…</div>
+              ? <div style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-3)' }}>Loading…</div>
               : Object.keys(deptCounts).length === 0
-                ? <div style={{ textAlign: 'center', color: 'rgba(255,255,255,.3)', fontSize: '13px' }}>No open maintenance work</div>
-                : Object.entries(deptCounts)
-                    .sort(([,a],[,b]) => b - a)
-                    .map(([dept, count]) => {
-                      const maxVal = Math.max(...Object.values(deptCounts));
-                      const pct = Math.round((count / maxVal) * 100);
-                      const color = DEPT_COLOR[dept] ?? '#6366f1';
-                      return (
-                        <div key={dept} style={{ marginBottom: '16px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
-                            <span style={{ color: '#e2e8f0', fontWeight: 500 }}>{dept}</span>
-                            <span style={{ color: color, fontWeight: 600 }}>{count}</span>
-                          </div>
-                          <div style={{ height: '6px', borderRadius: '3px', background: 'rgba(255,255,255,.07)', overflow: 'hidden' }}>
-                            <div style={{
-                              height: '100%', borderRadius: '3px',
-                              background: `linear-gradient(90deg, ${color}, ${color}aa)`,
-                              width: `${pct}%`,
-                              transition: 'width .6s cubic-bezier(.4,0,.2,1)',
-                            }} />
-                          </div>
+                ? <div style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-3)' }}>No open maintenance work</div>
+                : Object.entries(deptCounts).sort(([,a],[,b]) => b - a).map(([dept, count]) => {
+                    const maxVal = Math.max(...Object.values(deptCounts));
+                    const pct = Math.round((count / maxVal) * 100);
+                    const color = DEPT_COLOR[dept] ?? 'var(--violet)';
+                    return (
+                      <div key={dept} style={{ marginBottom: 18 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-2)', letterSpacing: '.05em' }}>{dept}</span>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color, fontWeight: 500 }}>{count}</span>
                         </div>
-                      );
-                    })
+                        <div style={{ height: 4, borderRadius: 2, background: 'var(--border-2)', overflow: 'hidden' }}>
+                          <div style={{
+                            height: '100%', borderRadius: 2,
+                            background: `linear-gradient(90deg, ${color}, ${color}88)`,
+                            width: `${pct}%`,
+                            transition: 'width .6s cubic-bezier(.4,0,.2,1)',
+                            boxShadow: `0 0 8px ${color}55`,
+                          }} />
+                        </div>
+                      </div>
+                    );
+                  })
             }
           </div>
         </section>
 
       </div>
 
-      {lastUpdated && (
-        <div style={{ marginTop: '16px', fontSize: '11px', color: 'rgba(255,255,255,.2)', textAlign: 'right' }}>
-          Last updated: {lastUpdated.toLocaleTimeString()}
-        </div>
-      )}
-
-      {/* Spin keyframe */}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
