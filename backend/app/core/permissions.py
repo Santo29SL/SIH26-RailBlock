@@ -69,3 +69,8 @@ class RequireRole:
                 detail=f"User role '{current_user.role}' is not authorized. Allowed: {self.allowed_roles}",
             )
         return current_user
+
+
+# Permission stub per Railway Board letter dated 16.06.2022 (DRM ≤ 4 hr; GM sanction for NI ≤ 3 days)
+require_divisional_authority = RequireRole([UserRole.ADMIN, UserRole.DIVISIONAL_AUTHORITY])
+"""Approval of traffic blocks > 4 hours and NI works > 3 days, per Railway Board letter dated 16.06.2022 (DRM ≤ 4 hr; GM sanction for NI ≤ 3 days)."""

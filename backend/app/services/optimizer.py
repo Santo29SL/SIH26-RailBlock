@@ -3,7 +3,7 @@
 Stage 5 Algorithmic Core for RailBlock (SIH PS 26027).
 
 Assigns candidate Joint Shadow Blocks into available Corridor Gaps over rolling
-planning horizons using Google OR-Tools CP-SAT Mixed-Integer Linear Programming (MILP),
+planning horizons using Google OR-Tools CP-SAT (constraint programming),
 enforcing Tier 1 (Rajdhani/Vande Bharat) zero-detention hard constraints and heavy machine
 resource capacity limits across sections while maximizing multi-objective score:
     max sum( y_{m,g} * [ Criticality(m) + alpha * ShadowHours(m) - beta * DetentionMinutes(m,g) ] )
@@ -245,7 +245,7 @@ def solve_block_schedule(
     target_date: Optional[date] = None,
     all_request_ids: Optional[Sequence[UUID]] = None,
 ) -> OptimizationResult:
-    """Solve the Mixed-Integer Linear Programming (MILP / CP-SAT) block assignment problem.
+    """Solve the OR-Tools CP-SAT (constraint programming) block assignment problem.
 
     Assigns candidate Joint Shadow Blocks into available Corridor Gaps over rolling
     planning horizons, enforcing:
@@ -620,8 +620,8 @@ def _score_requests_for_optimization(
     Explicit upstream scores are preserved. Requests without a score are passed
     through the Stage 2 risk engine, and the prediction plus its explanation are
     placed in request metadata so Stage 4's canonical CI reader consumes it.
-    If the model is degraded, no value is injected and clustering retains its
-    deterministic priority/formula fallback.
+    If the ML bundle is unavailable, the risk engine's transparent rule-based
+    score is injected instead so the downstream pipeline remains deterministic.
     """
     summary = {"ml_scored": 0, "explicit_scores_preserved": 0, "fallback_scores": 0}
 
@@ -642,14 +642,15 @@ def _score_requests_for_optimization(
             continue
 
         prediction = risk_engine.predict_risk(request, target_date=target_date)
-        if prediction.get("model_used") == "deterministic_fallback":
+        if prediction.get("scoring_mode") == "MODE_1":
             summary["fallback_scores"] += 1
-            continue
+        else:
+            summary["ml_scored"] += 1
 
         metadata.update(
             {
                 "criticality_index": prediction["criticality_index"],
-                "criticality_source": "ml_risk_engine",
+                "criticality_source": "risk_engine",
                 "criticality_model": prediction["model_used"],
                 "criticality_explanation": prediction["shap_explanation"],
             }
@@ -661,8 +662,6 @@ def _score_requests_for_optimization(
                 request["metadata_json"] = metadata
         else:
             setattr(request, "metadata_json", metadata)
-        summary["ml_scored"] += 1
-
     return summary
 
 
@@ -686,7 +685,7 @@ def run_optimization_pipeline(
     1. Stage 2 (ml_risk_engine): Scores unscored maintenance requests with XGBoost + SHAP.
     2. Stage 3 (gap_extractor): Extracts unoccupied corridor gaps from timetabled train movements.
     3. Stage 4 (clustering): Groups pending maintenance requests into candidate Joint Shadow Blocks.
-    4. Stage 5 (optimizer): Mixed-integer linear programming (MILP / CP-SAT) space-time scheduling.
+    4. Stage 5 (optimizer): OR-Tools CP-SAT constraint-programming scheduler.
 
     Args:
         movements: Sequence of timetabled TrainMovement records.
@@ -727,18 +726,20 @@ def run_optimization_pipeline(
             if s_id is not None:
                 target_sections.add(s_id)
 
-    # 3. Extract Corridor Gaps across all sections (Stage 3)
+    # 3. Extract Corridor Gaps across all sections and all horizon days (Stage 3)
     all_gaps: List[CorridorGap] = []
-    for s_id in target_sections:
-        sec_gaps = extract_corridor_gaps(
-            movements=movements,
-            target_date=effective_date,
-            section_id=s_id,
-            min_gap_minutes=gap_min,
-            safety_buffer_minutes=sec_buffer,
-            horizon_days=horizon_days,
-        )
-        all_gaps.extend(sec_gaps)
+    for day_offset in range(horizon_days):
+        current_date = effective_date + timedelta(days=day_offset)
+        for s_id in target_sections:
+            sec_gaps = extract_corridor_gaps(
+                movements=movements,
+                target_date=current_date,
+                section_id=s_id,
+                min_gap_minutes=gap_min,
+                safety_buffer_minutes=sec_buffer,
+                horizon_days=1,
+            )
+            all_gaps.extend(sec_gaps)
 
     # 4. Cluster Maintenance Requests into Candidate Shadow Blocks (Stage 4)
     candidate_blocks = cluster_shadow_blocks(

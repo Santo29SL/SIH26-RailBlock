@@ -237,8 +237,13 @@ def extract_corridor_gaps(
     handles continuous rolling midnight boundaries across days, segregates directional
     tracks (UP vs DOWN line), and flags proximity to high-priority VIP passenger trains.
 
+    Freight Forecast Overlay:
+    Anticipated goods-train paths from the COA goods trains forecast (flagged FORECAST_FREIGHT)
+    are included as corridor occupancy identical to scheduled movements (MVP simplification),
+    ensuring that extracted gaps reflect both scheduled timetable and forecast freight demand.
+
     Args:
-        movements: Timetabled TrainMovement records (with departure_time, arrival_time, day_of_week, train).
+        movements: TrainMovement records (SCHEDULED and FORECAST_FREIGHT, with departure_time, arrival_time, day_of_week, train).
         target_date: Target planning date for corridor gap extraction.
         section_id: Target Section UUID.
         min_gap_minutes: Minimum duration in minutes for an unoccupied window to qualify as a Corridor Gap.

@@ -1,0 +1,220 @@
+/* IRCTC & Indian Railways Utilitarian Theme — Strict 0-radius, clean government portal design */
+
+:root {
+  --ir-navy: #003366;
+  --ir-blue-dark: #002244;
+  --ir-blue-light: #004d99;
+  --ir-orange: #f37021;
+  --ir-orange-dark: #d85d11;
+  --ir-gold: #ffb74d;
+  --ir-red: #c62828;
+  --ir-green: #2e7d32;
+  --ir-yellow: #f57f17;
+  --ir-gray-bg: #f0f2f5;
+  --ir-gray-card: #ffffff;
+  --ir-border: #999999;
+  --ir-border-light: #d0d7de;
+  --ir-text-primary: #111111;
+  --ir-text-secondary: #444444;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border-radius: 0px !important; /* Strict IRCTC Utilitarian: No rounded corners */
+}
+
+body {
+  font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+  background-color: var(--ir-gray-bg);
+  color: var(--ir-text-primary);
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+code, .mono {
+  font-family: 'Roboto Mono', Menlo, Monaco, Consolas, monospace;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #e0e0e0;
+}
+::-webkit-scrollbar-thumb {
+  background: #003366;
+}
+
+/* Base utility classes */
+.ir-container {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 8px;
+}
+
+.ir-panel {
+  background: #ffffff;
+  border: 1px solid var(--ir-border);
+  margin-bottom: 12px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+
+.ir-panel-header {
+  background: var(--ir-navy);
+  color: #ffffff;
+  padding: 6px 12px;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid var(--ir-orange);
+}
+
+.ir-panel-body {
+  padding: 10px;
+}
+
+/* Button styles */
+.ir-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  transition: background-color 0.1s ease;
+}
+
+.ir-btn-primary {
+  background-color: var(--ir-orange);
+  color: #ffffff;
+  border-color: var(--ir-orange-dark);
+}
+.ir-btn-primary:hover {
+  background-color: var(--ir-orange-dark);
+}
+
+.ir-btn-navy {
+  background-color: var(--ir-navy);
+  color: #ffffff;
+  border-color: var(--ir-blue-dark);
+}
+.ir-btn-navy:hover {
+  background-color: var(--ir-blue-light);
+}
+
+.ir-btn-outline {
+  background-color: #ffffff;
+  color: var(--ir-navy);
+  border-color: var(--ir-navy);
+}
+.ir-btn-outline:hover {
+  background-color: #f0f4f8;
+}
+
+.ir-btn-danger {
+  background-color: var(--ir-red);
+  color: #ffffff;
+  border-color: #8e0000;
+}
+.ir-btn-danger:hover {
+  background-color: #b71c1c;
+}
+
+.ir-btn-success {
+  background-color: var(--ir-green);
+  color: #ffffff;
+  border-color: #1b5e20;
+}
+.ir-btn-success:hover {
+  background-color: #2e7d32;
+}
+
+/* Tables */
+.ir-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  background: #ffffff;
+}
+
+.ir-table th {
+  background: #e9ecef;
+  color: var(--ir-blue-dark);
+  font-weight: 700;
+  text-align: left;
+  padding: 6px 8px;
+  border: 1px solid var(--ir-border-light);
+  border-bottom: 2px solid var(--ir-navy);
+}
+
+.ir-table td {
+  padding: 6px 8px;
+  border: 1px solid var(--ir-border-light);
+  vertical-align: middle;
+}
+
+.ir-table tr:nth-child(even) {
+  background-color: #fafbfc;
+}
+
+.ir-table tr:hover {
+  background-color: #f1f5f9;
+}
+
+/* Badges */
+.ir-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.ir-badge-vip {
+  background-color: #ffebee;
+  color: var(--ir-red);
+  border-color: var(--ir-red);
+}
+
+.ir-badge-express {
+  background-color: #fff3e0;
+  color: var(--ir-orange-dark);
+  border-color: var(--ir-orange);
+}
+
+.ir-badge-freight {
+  background-color: #eceff1;
+  color: #455a64;
+  border-color: #90a4ae;
+}
+
+.ir-badge-proposed {
+  background-color: #fffde7;
+  color: #f57f17;
+  border-color: #fbc02d;
+}
+
+.ir-badge-active {
+  background-color: #ffebee;
+  color: #c62828;
+  border-color: #d32f2f;
+}
+
+.ir-badge-completed {
+  background-color: #e8f5e9;
+  color: var(--ir-green);
+  border-color: var(--ir-green);
+}

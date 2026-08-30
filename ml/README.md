@@ -12,7 +12,8 @@ cd backend
 pytest tests/test_ml_risk_engine.py -v
 ```
 
-`train.py` generates 10,000 reproducible domain-shaped samples, compares
-XGBoost and LightGBM with five-fold cross-validation, saves metrics under
-`ml/models/`, and exports the winning tree model to
-`backend/data/ml_models/criticality_xgboost_v1.joblib`.
+`train.py` generates reproducible domain-shaped samples, trains and calibrates
+the XGBoost failure-risk model, and exports the versioned native artifact
+bundle to `backend/data/ml_models/criticality_v1/`. The bundle includes the
+native XGBoost model, calibrator, schema, enums, SHAP background distribution,
+calibration mapping, and model card with integrity metadata.

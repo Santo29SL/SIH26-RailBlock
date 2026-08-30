@@ -28,6 +28,7 @@ ortools>=9.8.3296
 scikit-learn>=1.5.0
 xgboost>=2.1.0
 lightgbm>=4.4.0
+catboost>=1.2.0
 
 # Explainable AI — SHAP feature attribution for controller transparency
 shap>=0.46.0

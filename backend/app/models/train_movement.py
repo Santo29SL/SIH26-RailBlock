@@ -33,6 +33,9 @@ class TrainMovement(Base):
     day_of_week: Mapped[int] = mapped_column(
         Integer, nullable=False, index=True
     )  # 0=Monday, 6=Sunday
+    movement_type: Mapped[str] = mapped_column(
+        String(30), default="SCHEDULED", server_default="SCHEDULED", nullable=False
+    )  # SCHEDULED or FORECAST_FREIGHT
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

@@ -8,7 +8,8 @@ from app.models.resource import Resource
 from app.models.compatibility_rule import CompatibilityRule
 from app.models.block import Block
 from app.models.block_job import BlockJob
-from app.models.user import User, UserRole
+from app.models.enums import USFDClassification
+from app.models.user import RoleEnum, User, UserRole
 
 __all__ = [
     "Section",
@@ -21,4 +22,6 @@ __all__ = [
     "BlockJob",
     "User",
     "UserRole",
+    "RoleEnum",
+    "USFDClassification",
 ]

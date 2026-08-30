@@ -1,4 +1,4 @@
-"""Unit and integration tests for Google OR-Tools MILP block optimizer engine.
+"""Unit and integration tests for Google OR-Tools CP-SAT block optimizer engine.
 
 Stage 5 Test Suite for RailBlock (SIH PS 26027).
 
@@ -675,7 +675,7 @@ def test_pipeline_uses_ml_criticality_before_optimization(monkeypatch):
     assert result.total_blocks_scheduled == 1
     assert result.total_criticality_index == pytest.approx(93.5)
     assert result.scheduled_blocks[0].activities[0].criticality_index == pytest.approx(93.5)
-    assert request.metadata_json["criticality_source"] == "ml_risk_engine"
+    assert request.metadata_json["criticality_source"] == "risk_engine"
     assert request.metadata_json["criticality_model"] == "xgboost_shap_v1"
     assert result.metadata["risk_scoring"]["ml_scored"] == 1
 

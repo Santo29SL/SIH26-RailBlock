@@ -1,0 +1,14 @@
+{
+  "usfd_enum": {
+    "Good": 0,
+    "OBS": 1,
+    "OBSW": 2,
+    "IMR": 3,
+    "IMRW": 4
+  },
+  "departments": [
+    "TRACK",
+    "SIGNAL",
+    "TRACTION"
+  ]
+}
