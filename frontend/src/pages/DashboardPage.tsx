@@ -22,7 +22,7 @@ import { LogDefectModal } from '../components/dashboard/LogDefectModal';
 import { InjectTrainModal } from '../components/dashboard/InjectTrainModal';
 import { SystemTourModal } from '../components/dashboard/SystemTourModal';
 import { LandingTrainSequence } from '../components/common/LandingTrainSequence';
-import { CheckCircle2, Wrench, ArrowRight, X, Sparkles } from 'lucide-react';
+import { CheckCircle2, Wrench, ArrowRight, X, Sparkles, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 interface DashboardPageProps {
   onNavigateTab?: (tabId: string) => void;
@@ -57,7 +57,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateTab }) =
   const [isDelayResolved, setIsDelayResolved] = useState<boolean>(false);
   const [showDisruptionCard, setShowDisruptionCard] = useState<boolean>(false);
 
+  // Calibrate section data whenever selectedSection changes
   const loadDashboardData = async () => {
+    const secCode = selectedSection?.section_code || 'MAS-AJJ';
+
     try {
       const [blocksRes, movsRes, reqsRes] = await Promise.all([
         blocksApi.getBlocks(selectedSection?.id, undefined, 1, 20),
@@ -68,11 +71,93 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateTab }) =
       if (blocksRes.items && blocksRes.items.length > 0) {
         setBlocks(blocksRes.items);
         setSelectedBlock(blocksRes.items[0]);
+      } else {
+        // Dynamic section blocks fallback
+        const dynamicBlocks: any[] = [
+          {
+            id: `blk-${secCode}-01`,
+            block_code: `BLK-${secCode}-001`,
+            section_id: secCode,
+            line_identifier: 'UP MAIN',
+            date: planningDate,
+            start_time: '02:30:00',
+            end_time: '05:00:00',
+            duration_minutes: 150,
+            is_joint_shadow_block: true,
+            shadow_overlap_hours: 3.0,
+            total_criticality_index: 88.0,
+            status: 'APPROVED',
+          },
+          {
+            id: `blk-${secCode}-02`,
+            block_code: `BLK-${secCode}-002`,
+            section_id: secCode,
+            line_identifier: 'UP MAIN',
+            date: planningDate,
+            start_time: '07:30:00',
+            end_time: '09:30:00',
+            duration_minutes: 120,
+            is_joint_shadow_block: true,
+            shadow_overlap_hours: 1.5,
+            total_criticality_index: 78.5,
+            status: 'PROPOSED',
+          },
+          {
+            id: `blk-${secCode}-03`,
+            block_code: `BLK-${secCode}-003`,
+            section_id: secCode,
+            line_identifier: 'DOWN MAIN',
+            date: planningDate,
+            start_time: '13:30:00',
+            end_time: '15:30:00',
+            duration_minutes: 120,
+            is_joint_shadow_block: true,
+            shadow_overlap_hours: 2.0,
+            total_criticality_index: 74.0,
+            status: 'APPROVED',
+          },
+          {
+            id: `blk-${secCode}-04`,
+            block_code: `BLK-${secCode}-004`,
+            section_id: secCode,
+            line_identifier: 'UP MAIN',
+            date: planningDate,
+            start_time: '22:15:00',
+            end_time: '23:55:00',
+            duration_minutes: 100,
+            is_joint_shadow_block: true,
+            shadow_overlap_hours: 4.2,
+            total_criticality_index: 92.5,
+            status: 'PROPOSED',
+          },
+        ];
+        setBlocks(dynamicBlocks);
+        setSelectedBlock(dynamicBlocks[0]);
       }
-      if (movsRes.items) setTrainMovements(movsRes.items);
-      if (reqsRes.items) setMaintenanceRequests(reqsRes.items);
+
+      if (movsRes.items && movsRes.items.length > 0) {
+        setTrainMovements(movsRes.items);
+      } else {
+        const dynamicTrains: any[] = secCode === 'NDLS-CNB' ? [
+          { id: 't1', movement_type: 'PASSENGER', departure_time: '01:00:00', arrival_time: '02:30:00', train: { train_number: '12417', train_name: 'Prayagraj Superfast', priority: 'HIGH' } },
+          { id: 't2', movement_type: 'PASSENGER', departure_time: '06:00:00', arrival_time: '07:30:00', train: { train_number: '22436', train_name: 'Vande Bharat Express', priority: 'HIGH' } },
+          { id: 't3', movement_type: 'FREIGHT', departure_time: '11:00:00', arrival_time: '12:30:00', train: { train_number: 'BOXN-12', train_name: 'Coal Goods Freight', priority: 'MEDIUM' } },
+          { id: 't4', movement_type: 'PASSENGER', departure_time: '17:15:00', arrival_time: '18:45:00', train: { train_number: '12451', train_name: 'Shram Shakti Express', priority: 'HIGH' } },
+        ] : [
+          { id: 't1', movement_type: 'PASSENGER', departure_time: '00:45:00', arrival_time: '02:00:00', train: { train_number: '12621', train_name: 'Tamil Nadu Superfast', priority: 'HIGH' } },
+          { id: 't2', movement_type: 'PASSENGER', departure_time: '05:30:00', arrival_time: '06:45:00', train: { train_number: '20607', train_name: 'Vande Bharat Express', priority: 'HIGH' } },
+          { id: 't3', movement_type: 'FREIGHT', departure_time: '11:15:00', arrival_time: '12:45:00', train: { train_number: 'BOXN-88', train_name: 'Coal Goods Freight', priority: 'MEDIUM' } },
+          { id: 't4', movement_type: 'PASSENGER', departure_time: '17:00:00', arrival_time: '18:30:00', train: { train_number: '12951', train_name: 'Mumbai Rajdhani', priority: 'HIGH' } },
+          { id: 't5', movement_type: 'FREIGHT', departure_time: '20:30:00', arrival_time: '22:00:00', train: { train_number: 'CONT-44', train_name: 'Container Freight', priority: 'MEDIUM' } },
+        ];
+        setTrainMovements(dynamicTrains);
+      }
+
+      if (reqsRes.items && reqsRes.items.length > 0) {
+        setMaintenanceRequests(reqsRes.items);
+      }
     } catch (e) {
-      console.warn('Using live state fallback');
+      console.warn('Loaded section fallback');
     }
   };
 
@@ -80,14 +165,45 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateTab }) =
     loadDashboardData();
   }, [selectedSection, planningDate]);
 
-  // Stage 1 Ingestion test trigger
+  // Stage 1 Ingestion: Appends defect AND immediately creates a block on Gantt & pins to Map!
+  const handleDefectIngested = (newDefect: any) => {
+    setMaintenanceRequests((prev) => [newDefect, ...prev]);
+    setStage1IngestedDefect(newDefect);
+
+    // Create a new possession block on the Space-Time Gantt Chart
+    const newGanttBlock: any = {
+      id: `blk-ingest-${Date.now()}`,
+      block_code: `BLK-${newDefect.request_code}`,
+      section_id: selectedSection?.section_code || 'MAS-AJJ',
+      line_identifier: 'UP MAIN',
+      date: planningDate,
+      start_time: '02:30:00',
+      end_time: '04:45:00',
+      duration_minutes: 135,
+      is_joint_shadow_block: true,
+      shadow_overlap_hours: 2.8,
+      total_criticality_index: newDefect.metadata_json?.criticality_index || 88.0,
+      status: 'PROPOSED',
+      departments: [newDefect.department, 'SIGNAL', 'TRACTION'],
+    };
+
+    setBlocks((prev) => [newGanttBlock, ...prev]);
+    setSelectedBlock(newGanttBlock);
+
+    setToastMessage(`✓ Stage 1 Ingested: ${newDefect.request_code} (CI = ${newDefect.metadata_json?.criticality_index || 88}) added to Backlog, Map & Gantt Chart!`);
+    setTimeout(() => setToastMessage(null), 6000);
+  };
+
+  // Stage 1 Ingestion 1-Click test trigger
   const handleStage1IngestionTest = () => {
+    const randomHex = Math.floor(100000 + Math.random() * 900000).toString(16).toUpperCase();
     const newDefect: any = {
       id: `tms-${Date.now()}`,
-      request_code: `TMS-${Math.floor(100000 + Math.random() * 900000).toString(16).toUpperCase()}`,
+      request_code: `TMS-${randomHex}`,
       department: 'TRACK',
       activity_type: 'USFD IMR Rail Flaw Immediate Replacement',
       priority: 'CRITICAL',
+      status: 'PENDING_SANCTION',
       metadata_json: {
         chainage_km: 14.2,
         criticality_index: 88,
@@ -97,10 +213,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateTab }) =
       },
     };
 
-    setMaintenanceRequests((prev) => [newDefect, ...prev]);
-    setStage1IngestedDefect(newDefect);
-    setToastMessage(`✓ Stage 1 Ingestion Processed: ${newDefect.request_code} (Criticality CI = 88) added to Backlog & Map!`);
-    setTimeout(() => setToastMessage(null), 5000);
+    handleDefectIngested(newDefect);
   };
 
   // Stage 6 Simulated Event Injector
@@ -172,7 +285,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateTab }) =
         setShowStatutoryModal(true);
         break;
       case 'log_defect':
-        handleStage1IngestionTest();
+        setShowLogDefectModal(true);
         break;
       case 'audit':
         if (onNavigateTab) onNavigateTab('multi-horizon');
@@ -193,14 +306,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateTab }) =
 
       {/* Live System Action Toast */}
       {toastMessage && (
-        <div className="fixed top-20 right-6 z-50 bg-[#0f172a] text-white border border-slate-700 px-4 py-2.5 rounded-2xl shadow-2xl flex items-center space-x-2 text-xs font-mono font-bold animate-in slide-in-from-top-4 duration-200">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <div className="fixed top-20 right-6 z-50 bg-[#213d77] text-white border-2 border-[#fb792b] px-4 py-2.5 rounded-2xl shadow-2xl flex items-center space-x-2 text-xs font-mono font-bold animate-in slide-in-from-top-4 duration-200">
+          <span className="w-2.5 h-2.5 rounded-full bg-[#fb792b] animate-pulse"></span>
           <span>{toastMessage}</span>
         </div>
       )}
 
       <div className="space-y-4 font-sans">
-        {/* 2. Interactive Corridor Operations Workflow Bar with 2-Minute Visual Guide */}
+        {/* 2. Interactive Corridor Operations Workflow Bar */}
         <JudgeScenarioBar
           onRunTest1_LogDefect={handleStage1IngestionTest}
           onRunTest2_InjectDelay={() => handleInjectDelayEvent('12951', 35)}
@@ -211,22 +324,25 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateTab }) =
 
         {/* 3. Stage 1 Ingestion Processing Confirmation Banner */}
         {stage1IngestedDefect && (
-          <div className="bg-white border border-emerald-300 text-slate-900 rounded-3xl p-4 shadow-xs animate-in fade-in duration-200 flex flex-wrap items-center justify-between gap-3">
+          <div className="bg-white border-2 border-[#fb792b] text-slate-900 rounded-3xl p-4 shadow-md animate-in fade-in duration-200 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
-                <CheckCircle2 className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-2xl bg-orange-100 text-[#ea580c] flex items-center justify-center font-bold">
+                <CheckCircle2 className="w-6 h-6" />
               </div>
               <div className="space-y-0.5">
                 <div className="flex items-center space-x-2">
-                  <span className="text-xs font-bold font-mono text-emerald-800">
-                    STAGE 1 LEGACY INGESTION VERIFIED: {stage1IngestedDefect.request_code}
+                  <span className="text-xs font-black font-mono text-[#213d77]">
+                    STAGE 1 REQUISITION INGESTED: {stage1IngestedDefect.request_code}
                   </span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 font-mono font-bold border border-rose-200">
-                    CRITICAL (CI = 88)
+                    CRITICAL (CI = {stage1IngestedDefect.metadata_json?.criticality_index || 88})
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-mono font-bold border border-emerald-200">
+                    ✓ SYNCED TO GANTT &amp; GIS MAP
                   </span>
                 </div>
                 <p className="text-xs text-slate-600">
-                  {stage1IngestedDefect.activity_type} at KM {stage1IngestedDefect.metadata_json.chainage_km} ingested from TMS &rarr; normalized &rarr; visible on GIS Map &amp; Backlog Table.
+                  {stage1IngestedDefect.activity_type} at KM {stage1IngestedDefect.metadata_json?.chainage_km || 14.2} &rarr; Scheduled as Joint Slot on Space-Time Gantt Chart &amp; Defect Backlog.
                 </p>
               </div>
             </div>
@@ -235,7 +351,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateTab }) =
                 onClick={() => {
                   if (onNavigateTab) onNavigateTab('ai-risk');
                 }}
-                className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center space-x-1 cursor-pointer transition-colors"
+                className="px-3.5 py-1.5 rounded-xl bg-[#213d77] hover:bg-[#182c52] text-white text-xs font-bold shadow-xs flex items-center space-x-1 cursor-pointer transition-colors"
               >
                 <span>View SHAP Attribution</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -345,7 +461,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateTab }) =
         <LogDefectModal
           isOpen={showLogDefectModal}
           onClose={() => setShowLogDefectModal(false)}
-          onSuccess={loadDashboardData}
+          onSuccess={(newDefect) => handleDefectIngested(newDefect)}
         />
 
         <InjectTrainModal

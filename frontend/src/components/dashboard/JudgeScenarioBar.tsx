@@ -17,23 +17,23 @@ export const JudgeScenarioBar: React.FC<CorridorWorkflowBarProps> = ({
   onOpenTour,
 }) => {
   return (
-    <div className="bg-white border border-slate-200/90 rounded-3xl p-5 shadow-xs select-none font-sans">
+    <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs select-none font-sans">
       {/* Header Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3.5 mb-3.5">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-            <Zap className="w-4 h-4" />
+          <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#213d77] flex items-center justify-center font-bold">
+            <Zap className="w-4 h-4 text-[#fb792b]" />
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <h3 className="text-xs md:text-sm font-bold text-slate-900 tracking-wide">
+              <h3 className="text-xs md:text-sm font-black text-[#213d77] tracking-wide">
                 Corridor Operations &amp; Automated Dispatch Lifecycle
               </h3>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-200 font-mono">
+              <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-orange-50 text-[#ea580c] font-bold border border-orange-200 font-mono">
                 1-CLICK WORKFLOW
               </span>
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 font-medium">
               Step-by-step verification pipeline for multi-department block planning &amp; disruption recovery
             </p>
           </div>
@@ -43,9 +43,9 @@ export const JudgeScenarioBar: React.FC<CorridorWorkflowBarProps> = ({
           {onOpenTour && (
             <button
               onClick={onOpenTour}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition-colors cursor-pointer"
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#213d77] font-bold text-xs transition-colors cursor-pointer border border-slate-200"
             >
-              <BookOpen className="w-3.5 h-3.5 text-blue-600" />
+              <BookOpen className="w-3.5 h-3.5 text-[#fb792b]" />
               <span>How This System Works (2-Min Visual Guide)</span>
             </button>
           )}
@@ -61,17 +61,17 @@ export const JudgeScenarioBar: React.FC<CorridorWorkflowBarProps> = ({
         {/* Step 1 */}
         <button
           onClick={onRunTest1_LogDefect}
-          className="p-3.5 rounded-2xl bg-slate-50 hover:bg-white border border-slate-200 hover:border-blue-400 hover:shadow-xs transition-all text-left group cursor-pointer flex items-start space-x-3"
+          className="p-3.5 rounded-2xl bg-slate-50 hover:bg-white border border-slate-200 hover:border-[#fb792b] hover:shadow-md transition-all text-left group cursor-pointer flex items-start space-x-3"
         >
-          <div className="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 font-mono font-bold text-xs">
+          <div className="w-7 h-7 rounded-xl bg-orange-100 text-[#ea580c] flex items-center justify-center shrink-0 font-mono font-bold text-xs shadow-2xs">
             1
           </div>
           <div>
-            <span className="text-xs font-bold text-slate-900 block group-hover:text-blue-600 transition-colors">
+            <span className="text-xs font-bold text-slate-900 block group-hover:text-[#ea580c] transition-colors">
               Log Track Defect (TMS)
             </span>
             <span className="text-[11px] text-slate-500 block leading-snug mt-1">
-              Ingests USFD rail flaw &rarr; evaluates Criticality (CI = 88) on GIS map.
+              Ingests USFD rail flaw &rarr; creates Gantt possession &amp; pins on GIS map.
             </span>
           </div>
         </button>
@@ -79,9 +79,9 @@ export const JudgeScenarioBar: React.FC<CorridorWorkflowBarProps> = ({
         {/* Step 2 */}
         <button
           onClick={onRunTest2_InjectDelay}
-          className="p-3.5 rounded-2xl bg-slate-50 hover:bg-white border border-slate-200 hover:border-rose-400 hover:shadow-xs transition-all text-left group cursor-pointer flex items-start space-x-3"
+          className="p-3.5 rounded-2xl bg-slate-50 hover:bg-white border border-slate-200 hover:border-rose-400 hover:shadow-md transition-all text-left group cursor-pointer flex items-start space-x-3"
         >
-          <div className="w-6 h-6 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 font-mono font-bold text-xs">
+          <div className="w-7 h-7 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 font-mono font-bold text-xs shadow-2xs">
             2
           </div>
           <div>
@@ -97,13 +97,13 @@ export const JudgeScenarioBar: React.FC<CorridorWorkflowBarProps> = ({
         {/* Step 3 */}
         <button
           onClick={onRunTest3_SolveSchedule}
-          className="p-3.5 rounded-2xl bg-slate-50 hover:bg-white border border-slate-200 hover:border-emerald-400 hover:shadow-xs transition-all text-left group cursor-pointer flex items-start space-x-3"
+          className="p-3.5 rounded-2xl bg-slate-50 hover:bg-white border border-slate-200 hover:border-emerald-500 hover:shadow-md transition-all text-left group cursor-pointer flex items-start space-x-3"
         >
-          <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 font-mono font-bold text-xs">
+          <div className="w-7 h-7 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 font-mono font-bold text-xs shadow-2xs">
             3
           </div>
           <div>
-            <span className="text-xs font-bold text-slate-900 block group-hover:text-emerald-600 transition-colors">
+            <span className="text-xs font-bold text-slate-900 block group-hover:text-emerald-700 transition-colors">
               Optimize Schedule (CP-SAT)
             </span>
             <span className="text-[11px] text-slate-500 block leading-snug mt-1">
@@ -115,13 +115,13 @@ export const JudgeScenarioBar: React.FC<CorridorWorkflowBarProps> = ({
         {/* Step 4 */}
         <button
           onClick={onRunTest4_OpenStationMaster}
-          className="p-3.5 rounded-2xl bg-slate-50 hover:bg-white border border-slate-200 hover:border-blue-400 hover:shadow-xs transition-all text-left group cursor-pointer flex items-start space-x-3"
+          className="p-3.5 rounded-2xl bg-slate-50 hover:bg-white border border-slate-200 hover:border-[#213d77] hover:shadow-md transition-all text-left group cursor-pointer flex items-start space-x-3"
         >
-          <div className="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 font-mono font-bold text-xs">
+          <div className="w-7 h-7 rounded-xl bg-blue-100 text-[#213d77] flex items-center justify-center shrink-0 font-mono font-bold text-xs shadow-2xs">
             4
           </div>
           <div>
-            <span className="text-xs font-bold text-slate-900 block group-hover:text-blue-600 transition-colors">
+            <span className="text-xs font-bold text-slate-900 block group-hover:text-[#213d77] transition-colors">
               Station Master PN Grant
             </span>
             <span className="text-[11px] text-slate-500 block leading-snug mt-1">

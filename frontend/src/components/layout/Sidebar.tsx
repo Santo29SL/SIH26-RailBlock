@@ -93,34 +93,34 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
 
   return (
     <aside
-      className={`h-screen sticky top-0 shrink-0 bg-[#0f172a] text-white border-r border-slate-800 flex flex-col justify-between transition-all duration-300 z-30 select-none overflow-y-auto font-sans ${
+      className={`h-screen sticky top-0 shrink-0 bg-[#182c52] text-white border-r border-[#101e38] flex flex-col justify-between transition-all duration-300 z-30 select-none overflow-y-auto font-sans shadow-lg ${
         collapsed ? 'w-20' : 'w-64'
       }`}
     >
       {/* Brand Header */}
       <div>
-        <div className="p-4 border-b border-slate-800/80 flex items-center justify-between sticky top-0 bg-[#0f172a] z-10">
+        <div className="p-4 border-b border-[#101e38] flex items-center justify-between sticky top-0 bg-[#182c52] z-10">
           {!collapsed && (
             <div className="flex items-center space-x-2.5">
-              <div className="px-2 py-1 rounded-lg bg-blue-600 font-black text-xs text-white tracking-wider">
-                RB
+              <div className="px-2.5 py-1 rounded-lg bg-[#fb792b] font-black text-xs text-white tracking-wider shadow-xs">
+                IRCTC
               </div>
               <div>
-                <span className="text-xs font-bold text-white block leading-tight">CONTROL OFFICE</span>
-                <span className="text-[9px] text-slate-400 font-mono">CRIS • RDSO • SIH</span>
+                <span className="text-xs font-black text-white block leading-tight tracking-wide">CONTROL OFFICE</span>
+                <span className="text-[9px] text-blue-200 font-mono font-semibold">CRIS • RDSO • COA</span>
               </div>
             </div>
           )}
 
           {collapsed && (
-            <div className="mx-auto px-2 py-1 rounded bg-blue-600 font-black text-xs text-white">
-              RB
+            <div className="mx-auto px-2 py-1 rounded bg-[#fb792b] font-black text-xs text-white">
+              IR
             </div>
           )}
 
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg bg-[#101e38] hover:bg-[#213d77] text-blue-200 hover:text-white transition-colors cursor-pointer"
             title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
           >
             {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
@@ -139,11 +139,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
                 onClick={() => setActiveTab(item.id)}
                 className={`w-full flex items-center space-x-3 p-2.5 rounded-2xl transition-all text-left cursor-pointer group ${
                   isActive
-                    ? 'bg-blue-600 text-white shadow-xs font-bold'
-                    : 'text-slate-300 hover:bg-slate-800/70 hover:text-white'
+                    ? 'bg-[#fb792b] text-white shadow-md font-bold'
+                    : 'text-blue-100 hover:bg-[#213d77] hover:text-white'
                 }`}
               >
-                <div className={`p-1.5 rounded-xl shrink-0 ${isActive ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-300 group-hover:text-white'}`}>
+                <div className={`p-1.5 rounded-xl shrink-0 ${isActive ? 'bg-white/20 text-white' : 'bg-[#101e38] text-blue-200 group-hover:text-white'}`}>
                   <IconComp className="w-4 h-4" />
                 </div>
 
@@ -153,13 +153,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
                       <span className="text-xs truncate">{item.label}</span>
                       {item.badge && (
                         <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-bold ${
-                          isActive ? 'bg-white text-blue-600' : 'bg-slate-800 text-blue-400'
+                          isActive ? 'bg-white text-[#fb792b]' : 'bg-[#101e38] text-amber-300'
                         }`}>
                           {item.badge}
                         </span>
                       )}
                     </div>
-                    <span className={`text-[10px] block truncate font-normal ${isActive ? 'text-blue-100' : 'text-slate-400'}`}>
+                    <span className={`text-[10px] block truncate font-normal ${isActive ? 'text-orange-100' : 'text-blue-200'}`}>
                       {item.description}
                     </span>
                   </div>
@@ -171,8 +171,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
       </div>
 
       {/* User Role Card at Bottom */}
-      <div className="p-3 border-t border-slate-800/80 sticky bottom-0 bg-[#0f172a]">
-        <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-2.5 flex items-center space-x-2.5">
+      <div className="p-3 border-t border-[#101e38] sticky bottom-0 bg-[#182c52]">
+        <div className="bg-[#101e38] border border-blue-400/20 rounded-2xl p-2.5 flex items-center space-x-2.5">
           <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
             <Shield className="w-4 h-4" />
           </div>

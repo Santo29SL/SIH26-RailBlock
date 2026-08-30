@@ -11,6 +11,7 @@ import {
   Play,
   Calendar,
   CheckCircle2,
+  MapPin,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -93,56 +94,58 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="bg-[#0f172a] text-white border-b border-slate-800 select-none shadow-sm sticky top-0 z-40 font-sans">
-      {/* Top CRIS / RDSO Government Sub-header */}
-      <div className="bg-[#0b1120] px-4 md:px-6 py-1 border-b border-slate-800/80 flex items-center justify-between text-[11px] font-mono text-slate-400">
+    <header className="bg-[#213d77] text-white border-b border-[#182c52] select-none shadow-md sticky top-0 z-40 font-sans">
+      {/* Top Government Sub-header - IRCTC Navy Bar */}
+      <div className="bg-[#15284f] px-4 md:px-6 py-1 border-b border-[#0f1d38] flex items-center justify-between text-[11px] font-mono text-blue-200">
         <div className="flex items-center space-x-2">
-          <span className="font-semibold text-slate-300">MINISTRY OF RAILWAYS • CRIS / RDSO</span>
-          <span className="text-slate-600">|</span>
-          <span className="text-slate-400">SIH PS 26027</span>
+          <span className="font-bold text-white tracking-wide">MINISTRY OF RAILWAYS • GOVERNMENT OF INDIA</span>
+          <span className="text-slate-400">|</span>
+          <span className="text-blue-200">CRIS • RDSO • IRCTC</span>
         </div>
         <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-1.5">
-            <Clock className="w-3 h-3 text-slate-400" />
-            <span className="text-slate-300 font-semibold">{currentTime || '30/08/2026 03:00:00 IST'}</span>
+          <div className="flex items-center space-x-1">
+            <Clock className="w-3 h-3 text-[#fb792b]" />
+            <span>{currentTime || '30/08/2026 03:20:00 IST'}</span>
           </div>
           <div className="flex items-center space-x-1.5">
-            <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
-            <span className="text-[10px] text-slate-300 font-semibold">{isConnected ? 'COA STREAM ACTIVE' : 'STREAM READY'}</span>
+            <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-[#fb792b]'}`}></span>
+            <span className="text-[10px] uppercase font-bold text-white">
+              {isConnected ? 'COA LIVE' : 'FEED READY'}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Main Command Header Bar */}
+      {/* Main IRCTC Command Header */}
       <div className="px-4 md:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3">
-        {/* Left: Brand & Title */}
+        {/* Left Branding */}
         <div className="flex items-center space-x-3">
-          <div
-            onClick={() => setActiveTab && setActiveTab('dashboard')}
-            className="px-2.5 py-1 rounded-lg bg-blue-600 text-white font-black text-xs tracking-wider uppercase shadow-xs cursor-pointer hover:bg-blue-500 transition-colors"
-          >
-            RAILBLOCK
-          </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <h1 className="text-xs md:text-sm font-bold text-white tracking-wide">
-                Control Office Application (COA)
-              </h1>
-              <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-mono border border-slate-700">
-                v2.2
-              </span>
+          <div className="flex items-center space-x-2">
+            <div className="px-2.5 py-1 rounded-lg bg-[#fb792b] text-white font-black text-xs tracking-wider shadow-xs">
+              RAILBLOCK
             </div>
-            <p className="text-[10px] text-slate-400">
-              Automatic Multi-Department Corridor Possession &amp; Schedule Optimization
-            </p>
+            <div>
+              <div className="flex items-center space-x-1.5">
+                <h1 className="text-sm font-black tracking-wide text-white">
+                  Control Office Application (COA)
+                </h1>
+                <span className="text-[9px] px-1.5 py-0.2 rounded bg-white/20 text-white font-mono font-bold">
+                  v2.2
+                </span>
+              </div>
+              <p className="text-[10px] text-blue-100 font-semibold">
+                Automatic Multi-Department Corridor Possession &amp; Schedule Optimization
+              </p>
+            </div>
           </div>
         </div>
 
         {/* Center & Right Controls */}
         <div className="flex flex-wrap items-center gap-2 text-xs">
           {/* Section Corridor Dropdown */}
-          <div className="flex items-center bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-1.5 text-slate-200">
-            <span className="text-[10px] text-slate-400 font-mono mr-1.5 font-bold">SECTION:</span>
+          <div className="flex items-center bg-[#15284f] border border-blue-400/40 rounded-xl px-3 py-1.5 text-white shadow-xs">
+            <MapPin className="w-3.5 h-3.5 text-[#fb792b] mr-1.5 shrink-0" />
+            <span className="text-[10px] text-blue-200 font-mono mr-1.5 font-bold">SECTION:</span>
             <select
               value={selectedSection?.id || ''}
               onChange={(e) => {
@@ -152,8 +155,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="bg-transparent text-white font-bold text-xs outline-none cursor-pointer font-mono"
             >
               {sections.map((s) => (
-                <option key={s.id} value={s.id} className="bg-[#0f172a] text-white font-mono">
-                  {s.section_code} ({s.section_name})
+                <option key={s.id} value={s.id} className="bg-[#15284f] text-white font-mono">
+                  {s.section_code} — {s.section_name} ({s.length_km} km)
                 </option>
               ))}
             </select>
@@ -167,15 +170,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                 setShowRoleDropdown(false);
                 setShowAlertDropdown(false);
               }}
-              className="flex items-center space-x-1.5 bg-slate-800/80 border border-slate-700 hover:bg-slate-700 rounded-xl px-3 py-1.5 text-slate-200 font-mono font-bold text-xs cursor-pointer transition-colors"
+              className="flex items-center space-x-1.5 bg-[#15284f] border border-blue-400/40 hover:bg-[#1c356b] rounded-xl px-3 py-1.5 text-white font-mono font-bold text-xs cursor-pointer transition-colors"
             >
-              <Calendar className="w-3.5 h-3.5 text-blue-400" />
+              <Calendar className="w-3.5 h-3.5 text-[#fb792b]" />
               <span>{horizon}</span>
-              <ChevronDown className="w-3 h-3 text-slate-400" />
+              <ChevronDown className="w-3 h-3 text-blue-200" />
             </button>
 
             {showHorizonDropdown && (
-              <div className="absolute left-0 mt-1.5 w-48 bg-[#0f172a] border border-slate-700 rounded-2xl shadow-xl p-1.5 z-50 animate-in fade-in space-y-1">
+              <div className="absolute left-0 mt-1.5 w-48 bg-[#15284f] border border-blue-400/40 rounded-2xl shadow-xl p-1.5 z-50 animate-in fade-in space-y-1">
                 {HORIZONS.map((h) => (
                   <button
                     key={h}
@@ -188,7 +191,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       setShowHorizonDropdown(false);
                     }}
                     className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-colors cursor-pointer ${
-                      horizon === h ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'
+                      horizon === h ? 'bg-[#fb792b] text-white' : 'text-slate-200 hover:bg-white/10'
                     }`}
                   >
                     {h}
@@ -198,18 +201,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
 
-          {/* SOLVE SCHEDULE Trigger Button */}
+          {/* IRCTC Orange Action Button: OPTIMIZE SCHEDULE */}
           <button
             onClick={handleSolveSchedule}
             disabled={isOptimizing}
-            className={`px-3.5 py-1.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center space-x-1.5 shadow-xs transition-all cursor-pointer ${
+            className={`px-4 py-1.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center space-x-1.5 shadow-md transition-all cursor-pointer ${
               isOptimizing
                 ? 'bg-amber-600 text-white animate-pulse'
-                : 'bg-blue-600 hover:bg-blue-500 text-white'
+                : 'bg-[#fb792b] hover:bg-[#e06318] text-white'
             }`}
           >
-            <Play className={`w-3 h-3 fill-current ${isOptimizing ? 'animate-spin' : ''}`} />
-            <span>{isOptimizing ? 'SOLVING...' : 'OPTIMIZE SCHEDULE'}</span>
+            <Play className={`w-3.5 h-3.5 fill-current ${isOptimizing ? 'animate-spin' : ''}`} />
+            <span>{isOptimizing ? 'OPTIMIZING...' : 'OPTIMIZE SCHEDULE'}</span>
           </button>
 
           {/* Disruption Alert Bell */}
@@ -220,46 +223,49 @@ export const Navbar: React.FC<NavbarProps> = ({
                 setShowRoleDropdown(false);
                 setShowHorizonDropdown(false);
               }}
-              className="relative p-2 rounded-xl bg-slate-800/80 border border-slate-700 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
-              title="Telemetry Alerts"
+              className="p-2 rounded-xl bg-[#15284f] hover:bg-[#1c356b] border border-blue-400/40 text-blue-100 hover:text-white relative transition-colors cursor-pointer"
+              title="Notifications"
             >
               <Bell className="w-4 h-4" />
               {unreadAlerts.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[9px] font-bold flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[9px] font-mono font-bold flex items-center justify-center animate-bounce">
                   {unreadAlerts.length}
                 </span>
               )}
             </button>
 
             {showAlertDropdown && (
-              <div className="absolute right-0 mt-2 w-80 bg-[#0f172a] border border-slate-700 rounded-2xl shadow-2xl p-3 space-y-2 z-50 animate-in fade-in">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                  <span className="text-xs font-bold text-white">Live Disruption Alerts</span>
+              <div className="absolute right-0 mt-2 w-80 bg-white text-slate-900 border border-slate-200 rounded-2xl shadow-2xl p-3 z-50 animate-in fade-in space-y-2">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <span className="font-bold text-xs text-slate-800">Live Disruption Alerts</span>
                   <button
                     onClick={markAlertsAsRead}
-                    className="text-[10px] text-blue-400 hover:underline cursor-pointer"
+                    className="text-[10px] text-blue-600 hover:underline font-semibold"
                   >
-                    Mark all read
+                    Mark All Read
                   </button>
                 </div>
-                <div className="max-h-60 overflow-y-auto space-y-2 text-xs">
+
+                <div className="max-h-60 overflow-y-auto space-y-2">
                   {alerts.length === 0 ? (
-                    <p className="text-slate-400 text-center py-4">No active train delays detected.</p>
+                    <div className="text-center py-4 text-xs text-slate-500 font-mono">
+                      No active corridor alerts
+                    </div>
                   ) : (
                     alerts.map((a) => (
                       <div
                         key={a.id}
                         onClick={() => {
-                          openReschedulerForAlert(a);
+                          if (a.rescheduleRequired) openReschedulerForAlert(a);
                           setShowAlertDropdown(false);
                         }}
-                        className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-600/40 text-rose-200 cursor-pointer hover:bg-rose-900/50 space-y-1"
+                        className="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs space-y-1 cursor-pointer transition-colors"
                       >
-                        <div className="flex items-center justify-between font-bold">
-                          <span>Train #{a.train_number} Delay</span>
-                          <span className="text-[10px] bg-rose-600 text-white px-1.5 py-0.2 rounded font-bold">+{a.delay_minutes}m</span>
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono font-bold text-slate-900">Train #{a.trainCode}</span>
+                          <span className="text-[10px] text-rose-600 font-bold">+{a.delayMinutes}m Late</span>
                         </div>
-                        <p className="text-[11px] text-slate-300">{a.message}</p>
+                        <p className="text-[11px] text-slate-600">{a.actionAdvised}</p>
                       </div>
                     ))
                   )}
@@ -268,63 +274,62 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
 
-          {/* Role Persona Switcher Dropdown */}
+          {/* User Persona Switcher Pill */}
           <div className="relative">
             <button
               onClick={() => {
                 setShowRoleDropdown(!showRoleDropdown);
-                setShowAlertDropdown(false);
                 setShowHorizonDropdown(false);
+                setShowAlertDropdown(false);
               }}
-              className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800/80 border border-slate-700 hover:bg-slate-700 rounded-xl text-white font-mono font-bold text-xs transition-all cursor-pointer"
+              className="flex items-center space-x-2 bg-[#15284f] border border-blue-400/40 hover:bg-[#1c356b] rounded-xl px-3 py-1.5 text-slate-100 text-xs font-semibold cursor-pointer transition-colors"
             >
               <Shield className="w-3.5 h-3.5 text-emerald-400" />
-              <span>ROLE: {activePreset.label.toUpperCase()}</span>
-              <ChevronDown className="w-3 h-3 text-slate-400" />
+              <div className="flex items-center space-x-1">
+                <span className="text-[10px] text-blue-200 font-mono uppercase">ROLE:</span>
+                <span className="font-bold text-white truncate max-w-[170px]">{activePreset.label.split('(')[0]}</span>
+              </div>
+              <ChevronDown className="w-3 h-3 text-blue-200" />
             </button>
 
             {showRoleDropdown && (
-              <div className="absolute right-0 mt-2 w-80 bg-[#0f172a] border border-slate-700 rounded-2xl shadow-2xl p-2.5 z-50 animate-in fade-in space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block px-2.5 py-1">
-                  Switch Evaluation Role Persona:
-                </span>
-                {DEMO_PRESETS.map((p) => {
-                  const isSelected = user?.role === p.role;
-                  return (
-                    <button
-                      key={p.role}
-                      onClick={() => {
-                        switchRolePreset(p);
-                        setShowRoleDropdown(false);
-                      }}
-                      className={`w-full text-left p-2.5 rounded-xl transition-all flex items-start space-x-2.5 text-xs cursor-pointer ${
-                        isSelected ? 'bg-blue-600 text-white shadow-md' : 'hover:bg-slate-800 text-slate-200'
-                      }`}
-                    >
-                      <Shield className="w-4 h-4 shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold block">{p.label}</span>
-                          {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" />}
-                        </div>
-                        <span className={`text-[10px] block mt-0.5 ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
-                          {p.roleDescription}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
+              <div className="absolute right-0 mt-1.5 w-80 bg-white text-slate-900 border border-slate-200 rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in space-y-1.5">
+                <div className="px-2 py-1 text-[10px] font-mono uppercase font-bold text-slate-400 border-b border-slate-100">
+                  Switch User Persona
+                </div>
+                {DEMO_PRESETS.map((preset) => (
+                  <button
+                    key={preset.username}
+                    onClick={() => {
+                      switchRolePreset(preset);
+                      setShowRoleDropdown(false);
+                    }}
+                    className={`w-full text-left p-2 rounded-xl transition-all cursor-pointer ${
+                      user?.role === preset.role
+                        ? 'bg-blue-50 border border-blue-200 text-[#213d77]'
+                        : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <div className="font-bold text-xs flex items-center justify-between">
+                      <span>{preset.label}</span>
+                      {user?.role === preset.role && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">{preset.roleDescription}</p>
+                  </button>
+                ))}
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Solver Toast Notification */}
+      {/* Success Toast Banner */}
       {solveSuccessToast && (
-        <div className="bg-emerald-600 text-white px-4 py-2 text-xs font-mono font-bold flex items-center justify-center space-x-2 shadow-lg animate-in slide-in-from-top duration-200">
-          <CheckCircle2 className="w-4 h-4 text-emerald-200" />
-          <span>Google OR-Tools CP-SAT Solver Executed: 20 Possessions Optimized with 0 Min VIP Detention!</span>
+        <div className="bg-emerald-600 text-white px-4 py-2 text-xs font-mono font-bold flex items-center justify-between animate-in slide-in-from-top-2">
+          <div className="flex items-center space-x-2">
+            <CheckCircle2 className="w-4 h-4" />
+            <span>✓ Optimization Schedule Solved: 0 Min VIP Train Detention Guaranteed!</span>
+          </div>
         </div>
       )}
     </header>

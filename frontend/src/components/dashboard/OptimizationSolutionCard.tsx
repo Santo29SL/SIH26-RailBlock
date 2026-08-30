@@ -11,19 +11,19 @@ export const OptimizationSolutionCard: React.FC<OptimizationSolutionCardProps> =
   const [showLifecycleExplainer, setShowLifecycleExplainer] = useState<boolean>(false);
 
   return (
-    <div className="bg-white border border-slate-200/90 rounded-3xl p-5 shadow-xs select-none space-y-4 font-sans">
+    <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs select-none space-y-4 font-sans">
       {/* Header Row */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
         <div className="flex items-center space-x-3">
-          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
             <CheckCircle2 className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <h3 className="text-sm font-bold text-slate-900 tracking-wide">
+              <h3 className="text-sm font-black text-[#213d77] tracking-wide">
                 Corridor Possession Solution &amp; Impact Analysis
               </h3>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 font-mono">
+              <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-300 font-mono">
                 55% Downtime Cut
               </span>
             </div>
@@ -36,16 +36,16 @@ export const OptimizationSolutionCard: React.FC<OptimizationSolutionCardProps> =
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setShowLifecycleExplainer(!showLifecycleExplainer)}
-            className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center space-x-1.5 transition-colors cursor-pointer"
+            className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#213d77] text-xs font-bold flex items-center space-x-1.5 transition-colors cursor-pointer border border-slate-200"
           >
-            <Info className="w-3.5 h-3.5 text-blue-600" />
+            <Info className="w-3.5 h-3.5 text-[#fb792b]" />
             <span>How Requests Are Processed?</span>
           </button>
 
           {onOpenStatutory && (
             <button
               onClick={onOpenStatutory}
-              className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center space-x-1.5 transition-colors cursor-pointer"
+              className="px-4 py-1.5 rounded-xl bg-[#213d77] hover:bg-[#182c52] text-white text-xs font-bold shadow-xs flex items-center space-x-1.5 transition-colors cursor-pointer"
             >
               <span>Open Form T/351 Clearance</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -58,126 +58,119 @@ export const OptimizationSolutionCard: React.FC<OptimizationSolutionCardProps> =
       {showLifecycleExplainer && (
         <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-200 space-y-3 animate-in fade-in duration-150">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-blue-950 flex items-center space-x-2">
-              <GitMerge className="w-4 h-4 text-blue-600" />
-              <span>Where Does Your Request Go &amp; How Is It Processed?</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-[#213d77]">
+              End-to-End Corridor Possession Lifecycle
             </span>
-            <button
-              onClick={() => setShowLifecycleExplainer(false)}
-              className="text-xs text-blue-700 hover:underline font-bold cursor-pointer"
-            >
-              Close
-            </button>
+            <span className="text-[10px] text-slate-500 font-mono">G&amp;SR Chapter V Protocols</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-2.5 text-xs">
-            <div className="bg-white p-3 rounded-xl border border-blue-200 space-y-1">
-              <span className="text-[10px] font-bold text-blue-600 block font-mono">STAGE 1: INGESTION</span>
-              <span className="font-bold text-slate-900 block">TMS / SMMS / TDMS</span>
-              <p className="text-[11px] text-slate-600 leading-snug">
-                Defect tagged with asset location (e.g. KM 14.2) and severity.
-              </p>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+            <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-1">
+              <span className="text-[10px] font-bold text-[#fb792b] font-mono block">STAGE 1: TMS/SMMS</span>
+              <p className="text-slate-700 font-semibold">Asset Defect Ingested</p>
+              <p className="text-[11px] text-slate-500">Manual or telemetry feed logs track/signal/OHE flaws.</p>
             </div>
 
-            <div className="bg-white p-3 rounded-xl border border-blue-200 space-y-1">
-              <span className="text-[10px] font-bold text-purple-600 block font-mono">STAGE 2: RISK SCORING</span>
-              <span className="font-bold text-slate-900 block">Criticality Index (CI)</span>
-              <p className="text-[11px] text-slate-600 leading-snug">
-                Evaluates failure probability using USFD flaw type, track geometry, and overdue days.
-              </p>
+            <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-1">
+              <span className="text-[10px] font-bold text-[#fb792b] font-mono block">STAGE 2: CATBOOST</span>
+              <p className="text-slate-700 font-semibold">Criticality Scoring (CI)</p>
+              <p className="text-[11px] text-slate-500">Asset hazard model evaluates CI score &amp; urgency tier.</p>
             </div>
 
-            <div className="bg-white p-3 rounded-xl border border-blue-200 space-y-1">
-              <span className="text-[10px] font-bold text-amber-600 block font-mono">STAGE 3: SHADOW CLUSTER</span>
-              <span className="font-bold text-slate-900 block">3-Dept Joint Window</span>
-              <p className="text-[11px] text-slate-600 leading-snug">
-                Bundles Track, Signal &amp; Traction jobs sharing the same corridor span.
-              </p>
+            <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-1">
+              <span className="text-[10px] font-bold text-[#fb792b] font-mono block">STAGE 5: CP-SAT</span>
+              <p className="text-slate-700 font-semibold">Joint Bundle Solved</p>
+              <p className="text-[11px] text-slate-500">Bundles Track + Signal + TRD into 1 shadow slot.</p>
             </div>
 
-            <div className="bg-white p-3 rounded-xl border border-blue-200 space-y-1">
-              <span className="text-[10px] font-bold text-emerald-600 block font-mono">STAGE 4: SOLVE &amp; GRANT</span>
-              <span className="font-bold text-slate-900 block">OR-Tools CP-SAT + PN</span>
-              <p className="text-[11px] text-slate-600 leading-snug">
-                Places block into timetable gap; Station Master issues Private Number (Form T/351).
-              </p>
+            <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-1">
+              <span className="text-[10px] font-bold text-[#fb792b] font-mono block">STAGE 7: STATUTORY</span>
+              <p className="text-slate-700 font-semibold">Station Master PN Issued</p>
+              <p className="text-[11px] text-slate-500">Form T/351 Disconnection Private Numbers granted.</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Before vs. After Visual Comparison */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-        {/* Left Card: Before (Current Manual BDMS Planning) */}
-        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-          <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-            <span className="font-bold text-slate-800 text-xs">
-              Traditional Manual Planning (BDMS)
+      {/* Main Before vs. After Comparison Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Left Box: Before Optimization */}
+        <div className="p-4 rounded-2xl bg-rose-50/50 border border-rose-200 space-y-3">
+          <div className="flex items-center justify-between border-b border-rose-200/80 pb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-rose-800 flex items-center space-x-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+              <span>Legacy Decentralized Approach (3 Separate Requests)</span>
             </span>
-            <span className="text-[10px] font-bold bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full font-mono">
-              5.5 Hours Total Closed
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold font-mono">
+              9.6h Total Track Downtime
             </span>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-200">
-              <span className="text-slate-600 font-medium">1. Track (TMS) Solo Closure:</span>
-              <span className="font-bold text-slate-900 font-mono">2.5 hrs</span>
+          <div className="space-y-2 text-xs">
+            <div className="p-2.5 rounded-xl bg-white border border-rose-100 flex items-center justify-between">
+              <div>
+                <span className="font-bold text-slate-800 block">1. Track Engineering (TMS)</span>
+                <span className="text-[11px] text-slate-500 font-mono">00:45 - 04:15 (3.5h standalone block)</span>
+              </div>
+              <span className="text-[10px] font-mono font-bold text-rose-700">3.5h Loss</span>
             </div>
-            <div className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-200">
-              <span className="text-slate-600 font-medium">2. Signals (SMMS) Solo Closure:</span>
-              <span className="font-bold text-slate-900 font-mono">1.5 hrs</span>
-            </div>
-            <div className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-200">
-              <span className="text-slate-600 font-medium">3. Traction (TDMS) Solo Closure:</span>
-              <span className="font-bold text-slate-900 font-mono">1.5 hrs</span>
-            </div>
-          </div>
 
-          <div className="text-[11px] text-slate-600 pt-1 flex items-start space-x-1.5">
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-            <span>3 separate track stoppages, high passenger train detention, low corridor availability.</span>
+            <div className="p-2.5 rounded-xl bg-white border border-rose-100 flex items-center justify-between">
+              <div>
+                <span className="font-bold text-slate-800 block">2. Signal &amp; Telecom (SMMS)</span>
+                <span className="text-[11px] text-slate-500 font-mono">08:00 - 10:30 (2.5h standalone block)</span>
+              </div>
+              <span className="text-[10px] font-mono font-bold text-rose-700">2.5h Loss</span>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-white border border-rose-100 flex items-center justify-between">
+              <div>
+                <span className="font-bold text-slate-800 block">3. Electrical Traction (TDMS)</span>
+                <span className="text-[11px] text-slate-500 font-mono">13:30 - 17:06 (3.6h standalone block)</span>
+              </div>
+              <span className="text-[10px] font-mono font-bold text-rose-700">3.6h Loss</span>
+            </div>
           </div>
         </div>
 
-        {/* Right Card: After (Automated Joint Shadow Block) */}
+        {/* Right Box: After Optimization (RailBlock Solution) */}
         <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200 space-y-3">
-          <div className="flex items-center justify-between border-b border-emerald-200 pb-2">
-            <span className="font-bold text-emerald-950 text-xs flex items-center space-x-1.5">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>Optimized Joint Shadow Block (RailBlock)</span>
+          <div className="flex items-center justify-between border-b border-emerald-200/80 pb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 flex items-center space-x-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Optimized Joint Shadow Possession (1 Synchronized Slot)</span>
             </span>
-            <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-mono">
-              2.5 Hours Unified
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold font-mono">
+              4.3h Total Window (+5.3h Saved)
             </span>
           </div>
 
-          <div className="space-y-2">
-            <div className="bg-white p-2.5 rounded-xl border border-emerald-200 space-y-1">
-              <div className="flex justify-between items-center">
-                <span className="font-bold text-slate-900">Unified Possession Window:</span>
-                <span className="font-bold text-emerald-700 font-mono">02:30 — 05:00 IST</span>
-              </div>
-              <p className="text-[11px] text-slate-600 leading-snug">
-                Track, Signal, and 25 kV Traction teams work concurrently during natural late-night timetable gap.
-              </p>
+          <div className="p-3 rounded-xl bg-white border border-emerald-100 space-y-2 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-[#213d77]">BLK-20260829-002 (UP MAIN)</span>
+              <span className="text-xs font-mono font-bold text-emerald-700">02:30 — 05:00 IST</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-center">
-              <div className="bg-white p-2 rounded-xl border border-emerald-200">
-                <span className="text-[10px] text-slate-500 block">Downtime Saved:</span>
-                <span className="font-bold text-emerald-700 text-sm font-mono">+5.3 Hours (55%)</span>
-              </div>
-              <div className="bg-white p-2 rounded-xl border border-emerald-200">
-                <span className="text-[10px] text-slate-500 block">VIP Train Delay:</span>
-                <span className="font-bold text-blue-600 text-sm font-mono">0 Mins (Zero Delay)</span>
-              </div>
+            <p className="text-[11px] text-slate-600">
+              Bundles USFD rail replacement, Point Machine 114A overhaul, and 25 kV OHE catenary adjustment into a single synchronized window.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 font-mono text-[10px] font-bold border border-rose-200">
+                Track: 3.5h Work
+              </span>
+              <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-mono text-[10px] font-bold border border-amber-200">
+                Signal: 2.5h Work
+              </span>
+              <span className="px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 font-mono text-[10px] font-bold border border-sky-200">
+                Traction: 3.6h Work
+              </span>
             </div>
           </div>
 
-          <div className="text-[11px] text-emerald-900 font-medium pt-1 flex items-start space-x-1.5">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-            <span>1 physical track closure only, zero VIP passenger disruption, maximum corridor availability.</span>
+          <div className="flex items-center justify-between text-xs font-mono text-emerald-800 bg-emerald-100/60 p-2.5 rounded-xl border border-emerald-200">
+            <span className="font-bold">Net Corridor Efficiency:</span>
+            <span className="font-bold text-emerald-900">+5.3 Hours Saved | 0 VIP Train Delay</span>
           </div>
         </div>
       </div>

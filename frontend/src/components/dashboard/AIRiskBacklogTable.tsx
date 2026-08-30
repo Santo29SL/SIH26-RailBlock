@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Activity, ChevronRight, Filter, ArrowUpDown, Wrench, Radio, Zap, Eye } from 'lucide-react';
+import { Activity, ChevronRight, Filter, ArrowUpDown, Wrench, Radio, Zap, Eye, Sparkles } from 'lucide-react';
 import { MaintenanceRequest } from '../../types/block';
 
 interface AIRiskBacklogTableProps {
@@ -146,24 +146,24 @@ export const AIRiskBacklogTable: React.FC<AIRiskBacklogTableProps> = ({
   };
 
   return (
-    <div className="bg-white border border-slate-200/90 rounded-3xl overflow-hidden shadow-xs select-none font-sans">
-      {/* Header Bar */}
-      <div className="bg-slate-50 border-b border-slate-200 px-5 py-3.5 flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex items-center space-x-2 font-bold text-slate-900 tracking-wide">
-          <Activity className="w-4 h-4 text-blue-600" />
+    <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xs select-none font-sans">
+      {/* Header Bar - IRCTC Navy Bar */}
+      <div className="bg-[#213d77] px-5 py-3.5 flex flex-wrap items-center justify-between gap-3 text-xs text-white">
+        <div className="flex items-center space-x-2 font-bold tracking-wide">
+          <Activity className="w-4 h-4 text-[#fb792b]" />
           <span>PREDICTIVE RISK &amp; DEFECT ANALYSIS ENGINE (STAGE 2 — STATISTICAL HAZARD MODEL &amp; SHAP)</span>
         </div>
 
         {/* Filter and Sort Controls */}
         <div className="flex items-center space-x-2">
           {/* Department Filter Pills */}
-          <div className="flex items-center space-x-1 bg-white border border-slate-200 rounded-xl p-0.5 text-[10px] font-mono font-bold">
+          <div className="flex items-center space-x-1 bg-[#15284f] border border-blue-400/30 rounded-xl p-0.5 text-[10px] font-mono font-bold text-white">
             {['ALL', 'TRACK', 'SIGNAL', 'TRACTION'].map((dept) => (
               <button
                 key={dept}
                 onClick={() => setSelectedDeptFilter(dept)}
                 className={`px-2.5 py-1 rounded-lg cursor-pointer transition-colors ${
-                  selectedDeptFilter === dept ? 'bg-blue-600 text-white' : 'text-slate-600 hover:text-slate-900'
+                  selectedDeptFilter === dept ? 'bg-[#fb792b] text-white shadow-xs' : 'text-blue-200 hover:text-white'
                 }`}
               >
                 {dept}
@@ -174,10 +174,10 @@ export const AIRiskBacklogTable: React.FC<AIRiskBacklogTableProps> = ({
           {/* Sort Toggle Button */}
           <button
             onClick={() => setSortByCi(!sortByCi)}
-            className="flex items-center space-x-1 px-2.5 py-1 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-[10px] font-mono font-bold text-slate-700 cursor-pointer"
+            className="flex items-center space-x-1 px-2.5 py-1 rounded-xl bg-[#15284f] hover:bg-[#1c356b] border border-blue-400/30 text-[10px] font-mono font-bold text-white cursor-pointer"
             title="Sort by Criticality Index"
           >
-            <ArrowUpDown className="w-3 h-3 text-blue-600" />
+            <ArrowUpDown className="w-3 h-3 text-[#fb792b]" />
             <span>CI {sortByCi ? '↓' : '↑'}</span>
           </button>
         </div>
@@ -202,7 +202,7 @@ export const AIRiskBacklogTable: React.FC<AIRiskBacklogTableProps> = ({
           <tbody className="divide-y divide-slate-100 text-slate-800">
             {sortedItems.map((item, idx) => (
               <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                <td className="p-3.5 font-mono font-bold text-slate-900">
+                <td className="p-3.5 font-mono font-bold text-[#213d77]">
                   {item.requestCode}
                 </td>
                 <td className="p-3.5">
@@ -239,9 +239,9 @@ export const AIRiskBacklogTable: React.FC<AIRiskBacklogTableProps> = ({
                     onClick={() => {
                       if (onInspectDefect) onInspectDefect(item.rawRequest);
                     }}
-                    className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] inline-flex items-center space-x-1 cursor-pointer transition-colors shadow-xs"
+                    className="px-3 py-1.5 rounded-xl bg-[#213d77] hover:bg-[#182c52] text-white font-bold text-[11px] inline-flex items-center space-x-1 cursor-pointer transition-colors shadow-xs"
                   >
-                    <Eye className="w-3 h-3" />
+                    <Eye className="w-3.5 h-3.5 text-[#fb792b]" />
                     <span>Inspect</span>
                   </button>
                 </td>

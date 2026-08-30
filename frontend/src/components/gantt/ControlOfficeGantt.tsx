@@ -112,11 +112,11 @@ export const ControlOfficeGantt: React.FC<ControlOfficeGanttProps> = ({
     },
   ];
 
-  const getStatusBadgeColor = (status: string) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'APPROVED':
         return 'bg-emerald-100 text-emerald-800 border border-emerald-300';
-      case 'ACTIVE':
+      case 'REJECTED':
         return 'bg-rose-100 text-rose-800 border border-rose-300 animate-pulse';
       case 'COMPLETED':
         return 'bg-blue-100 text-blue-800 border border-blue-300';
@@ -126,19 +126,19 @@ export const ControlOfficeGantt: React.FC<ControlOfficeGanttProps> = ({
   };
 
   return (
-    <div className="bg-white border border-slate-200/90 rounded-3xl p-5 shadow-xs select-none space-y-4 font-sans">
+    <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs select-none space-y-4 font-sans">
       {/* Header Row */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
         <div className="flex items-center space-x-3">
-          <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-            <Clock className="w-5 h-5" />
+          <div className="w-9 h-9 rounded-xl bg-blue-50 text-[#213d77] flex items-center justify-center font-bold">
+            <Clock className="w-5 h-5 text-[#fb792b]" />
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <h3 className="text-sm font-bold text-slate-900 tracking-wide">
+              <h3 className="text-sm font-black text-[#213d77] tracking-wide">
                 Space-Time Possession &amp; Train Path Scheduler
               </h3>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-200 font-mono">
+              <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-blue-50 text-[#213d77] font-bold border border-blue-200 font-mono">
                 24-HOUR TIMETABLE
               </span>
             </div>
@@ -148,19 +148,19 @@ export const ControlOfficeGantt: React.FC<ControlOfficeGanttProps> = ({
           </div>
         </div>
 
-        {/* Action Controls */}
+        {/* Action Controls - Official IRCTC Buttons */}
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={onOpenLogDefect}
-            className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center space-x-1.5 transition-colors cursor-pointer"
+            className="px-3.5 py-1.5 rounded-xl bg-[#fb792b] hover:bg-[#e06318] text-white text-xs font-bold flex items-center space-x-1.5 shadow-xs transition-colors cursor-pointer"
           >
-            <Plus className="w-3.5 h-3.5 text-blue-600" />
+            <Plus className="w-3.5 h-3.5 text-white" />
             <span>+ Log Defect (TMS)</span>
           </button>
 
           <button
             onClick={onOpenInjectTrain}
-            className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center space-x-1.5 transition-colors cursor-pointer"
+            className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center space-x-1.5 transition-colors cursor-pointer border border-slate-200"
           >
             <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
             <span>Inject Delay (+35m)</span>
@@ -168,9 +168,9 @@ export const ControlOfficeGantt: React.FC<ControlOfficeGanttProps> = ({
 
           <button
             onClick={onOpenStatutory}
-            className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center space-x-1.5 transition-colors cursor-pointer"
+            className="px-3.5 py-1.5 rounded-xl bg-[#213d77] hover:bg-[#182c52] text-white text-xs font-bold shadow-xs flex items-center space-x-1.5 transition-colors cursor-pointer"
           >
-            <FileText className="w-3.5 h-3.5" />
+            <FileText className="w-3.5 h-3.5 text-blue-200" />
             <span>Form T/351</span>
           </button>
         </div>
@@ -219,125 +219,134 @@ export const ControlOfficeGantt: React.FC<ControlOfficeGanttProps> = ({
                 {hours.map((h) => (
                   <div
                     key={h}
-                    className="absolute top-0 bottom-0 w-[1px] bg-slate-200"
+                    className="absolute top-0 bottom-0 w-[1px] bg-slate-200/80"
                     style={{ left: `${(h / 24) * 100}%` }}
                   ></div>
                 ))}
 
-                {/* Train Movement Cards */}
-                {displayTrains.map((t: any, idx: number) => {
-                  let startMin = timeToMinutes(t.departure_time);
-                  let endMin = timeToMinutes(t.arrival_time);
-                  const isDelayed = activeDelayMinutes > 0 && (t.train?.train_number === activeDelayTrainNumber || t.train?.train_number === '12951');
+                {/* Train Movement Bars */}
+                {displayTrains.map((train, idx) => {
+                  let depMin = timeToMinutes(train.departure_time || '00:00:00');
+                  let arrMin = timeToMinutes(train.arrival_time || '02:00:00');
+                  if (arrMin <= depMin) arrMin = depMin + 90;
 
+                  const trainNo = train.train?.train_number || train.train_number || (idx === 0 ? '12621' : idx === 1 ? '20607' : idx === 2 ? 'BOXN-88' : idx === 3 ? '12951' : 'CONT-44');
+                  const isDelayed = activeDelayMinutes > 0 && trainNo === activeDelayTrainNumber;
                   if (isDelayed) {
-                    startMin += activeDelayMinutes;
-                    endMin += activeDelayMinutes;
+                    depMin += activeDelayMinutes;
+                    arrMin += activeDelayMinutes;
                   }
 
-                  const left = (startMin / totalMinutes) * 100;
-                  const width = Math.max(9, ((endMin - startMin) / totalMinutes) * 100);
+                  const leftPct = (depMin / totalMinutes) * 100;
+                  const widthPct = Math.max(12, ((arrMin - depMin) / totalMinutes) * 100);
 
-                  const isVip = t.train?.train_number === '20607' || t.train?.train_number === '12951';
-                  const isExpress = t.movement_type === 'PASSENGER' && !isVip;
+                  const isVip = trainNo === '20607' || trainNo === '12951' || train.train?.priority === 'HIGH';
 
                   return (
                     <div
-                      key={t.id || idx}
-                      className={`absolute top-1.5 bottom-1.5 rounded-lg px-2 flex flex-col justify-center text-white text-[10px] font-mono font-bold shadow-xs transition-all ${
+                      key={train.id || idx}
+                      className={`absolute top-1.5 bottom-1.5 rounded-xl px-2 py-1 text-white text-[10px] flex flex-col justify-between shadow-xs transition-all ${
                         isDelayed
-                          ? 'bg-rose-600 border-2 border-amber-300 ring-2 ring-rose-500 animate-pulse z-20'
+                          ? 'bg-rose-600 border-2 border-amber-300 ring-2 ring-rose-500 animate-pulse z-10'
                           : isVip
-                          ? 'bg-rose-600'
-                          : isExpress
-                          ? 'bg-blue-700'
-                          : 'bg-slate-700'
+                          ? 'bg-rose-600 border border-rose-400'
+                          : 'bg-[#213d77] border border-blue-400'
                       }`}
-                      style={{ left: `${Math.min(88, left % 100)}%`, width: `${Math.min(18, width)}%` }}
-                      title={`Train #${t.train?.train_number} ${t.train?.train_name} (${t.departure_time} - ${t.arrival_time})`}
+                      style={{
+                        left: `${Math.min(85, Math.max(1, leftPct))}%`,
+                        width: `${Math.min(14, widthPct)}%`,
+                      }}
+                      title={`Train #${trainNo} (${train.departure_time} - ${train.arrival_time})`}
                     >
-                      <div className="flex items-center justify-between text-[10px] leading-tight">
-                        <span className="truncate">#{t.train?.train_number}</span>
+                      <div className="flex items-center justify-between font-bold leading-tight">
+                        <span className="truncate">#{trainNo}</span>
                         {isDelayed && (
-                          <span className="text-[8px] bg-amber-300 text-slate-950 px-1 py-0.2 rounded font-black uppercase ml-1">
+                          <span className="text-[8px] bg-amber-300 text-slate-950 font-black px-1 rounded">
                             +{activeDelayMinutes}m
                           </span>
                         )}
                       </div>
-                      <div className="text-[9px] font-sans opacity-90 truncate leading-tight">
-                        {t.train?.train_name?.split(' ')[0]} ({t.departure_time?.slice(0, 5)} - {t.arrival_time?.slice(0, 5)})
-                      </div>
+                      <span className="truncate text-[9px] opacity-90 block font-semibold">
+                        {train.train?.train_name || 'Corridor Train'}
+                      </span>
                     </div>
                   );
                 })}
               </div>
             </div>
 
-            {/* Swimlane 2: Maintenance Blocks with Generous Height (h-24 = 96px) */}
+            {/* Swimlane 2: Bundled Maintenance Possessions */}
             <div className="flex items-center space-x-3">
               <div className="w-36 shrink-0 space-y-0.5">
                 <span className="text-[11px] font-bold text-slate-800 block">
-                  2. REPAIR POSSESSIONS
+                  2. POSSESSION SLOTS
                 </span>
-                <span className="text-[9px] text-slate-500 block leading-tight">
-                  Bundled Joint Shadow Slots
+                <span className="text-[9px] text-emerald-700 block font-bold font-mono">
+                  Bundled Multi-Dept
                 </span>
               </div>
               <div className="relative flex-1 h-24 bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-inner">
+                {/* 15m grid lines */}
                 {hours.map((h) => (
                   <div
                     key={h}
-                    className="absolute top-0 bottom-0 w-[1px] bg-slate-200"
+                    className="absolute top-0 bottom-0 w-[1px] bg-slate-200/80"
                     style={{ left: `${(h / 24) * 100}%` }}
                   ></div>
                 ))}
 
-                {/* Maintenance Possession Blocks */}
-                {displayBlocks.map((b) => {
-                  let startMin = timeToMinutes(b.start_time);
-                  let endMin = timeToMinutes(b.end_time);
-                  if (endMin <= startMin) endMin = Math.min(1435, startMin + (b.duration_minutes || 120));
+                {/* Possession Block Bars */}
+                {displayBlocks.map((block, idx) => {
+                  const depMin = timeToMinutes(block.start_time || '02:30:00');
+                  let arrMin = timeToMinutes(block.end_time || '05:00:00');
+                  if (arrMin <= depMin) arrMin = Math.min(1435, depMin + (block.duration_minutes || 120));
 
-                  const rawLeft = (startMin / totalMinutes) * 100;
-                  const rawWidth = Math.max(13, ((endMin - startMin) / totalMinutes) * 100);
+                  const leftPct = (depMin / totalMinutes) * 100;
+                  const widthPct = Math.max(14, ((arrMin - depMin) / totalMinutes) * 100);
 
-                  // Clamp to ensure the last box is completely visible
-                  const left = Math.min(84, Math.max(1, rawLeft));
-                  const width = Math.min(15, rawWidth);
-                  const isSelected = selectedBlock?.block_code === b.block_code || selectedBlock?.id === b.id;
+                  const isSelected = selectedBlock?.id === block.id || selectedBlock?.block_code === block.block_code;
 
                   return (
                     <div
-                      key={b.id}
-                      onClick={() => onSelectBlock(b)}
-                      className={`absolute top-2 bottom-2 rounded-xl p-2.5 flex flex-col justify-between text-white text-[10px] font-mono font-bold shadow-sm cursor-pointer transition-all ${
+                      key={block.id || idx}
+                      onClick={() => onSelectBlock(block)}
+                      className={`absolute top-1.5 bottom-1.5 rounded-xl p-2 text-white text-[10px] flex flex-col justify-between cursor-pointer transition-all shadow-md ${
                         isSelected
-                          ? 'bg-slate-900 border-2 border-blue-400 ring-2 ring-blue-500/30 scale-[1.02] z-10'
-                          : 'bg-[#0f172a] hover:bg-slate-800 border border-slate-700'
+                          ? 'bg-[#182c52] border-2 border-[#fb792b] ring-2 ring-orange-400/40 z-10'
+                          : 'bg-[#213d77] border border-blue-400/50 hover:border-white'
                       }`}
-                      style={{ left: `${left}%`, width: `${width}%` }}
+                      style={{
+                        left: `${Math.min(84, Math.max(1, leftPct))}%`,
+                        width: `${Math.min(15, widthPct)}%`,
+                      }}
                     >
-                      {/* Top Code and Times */}
-                      <div className="flex items-center justify-between font-bold leading-tight">
-                        <span className="truncate">{b.block_code}</span>
-                        <span className="text-[9px] bg-white/20 px-1 py-0.2 rounded font-sans uppercase ml-1 shrink-0">
-                          {b.start_time?.slice(0, 5)} - {b.end_time?.slice(0, 5)}
+                      <div className="flex items-center justify-between font-bold">
+                        <span className="truncate">{block.block_code}</span>
+                        <span className="text-[9px] font-mono bg-white/20 px-1 py-0.2 rounded shrink-0 ml-1">
+                          {block.start_time?.slice(0, 5)} - {block.end_time?.slice(0, 5)}
                         </span>
                       </div>
 
-                      {/* Department Badges (Rose, Amber, Sky) */}
-                      <div className="flex items-center space-x-1 text-[8px] font-bold">
-                        <span className="px-1 py-0.2 rounded bg-rose-500 text-white">Track</span>
-                        <span className="px-1 py-0.2 rounded bg-amber-400 text-slate-950">Signal</span>
-                        <span className="px-1 py-0.2 rounded bg-sky-400 text-slate-950">Traction</span>
+                      {/* Department Badges */}
+                      <div className="flex items-center space-x-1 my-1">
+                        <span className="px-1.5 py-0.2 rounded bg-rose-500 text-white font-mono text-[9px] font-bold">
+                          Track
+                        </span>
+                        <span className="px-1.5 py-0.2 rounded bg-amber-400 text-slate-950 font-mono text-[9px] font-bold">
+                          Signal
+                        </span>
+                        <span className="px-1.5 py-0.2 rounded bg-sky-400 text-slate-950 font-mono text-[9px] font-bold">
+                          TRD
+                        </span>
                       </div>
 
-                      {/* Status / Saved hours */}
-                      <div className="flex items-center justify-between text-[8px] text-emerald-300 font-bold border-t border-slate-700/60 pt-0.5">
-                        <span className={`px-1 py-0.2 rounded uppercase ${getStatusBadgeColor(b.status)}`}>
-                          {b.status}
+                      <div className="flex items-center justify-between border-t border-white/20 pt-1 text-[9px]">
+                        <span className="text-emerald-300 font-bold font-mono">
+                          +{block.shadow_overlap_hours || 3.0}h saved
                         </span>
-                        <span>+{b.shadow_overlap_hours || 3.0}h</span>
+                        <span className={`px-1.5 py-0.2 rounded font-mono font-bold ${getStatusBadge(block.status)}`}>
+                          {block.status}
+                        </span>
                       </div>
                     </div>
                   );
@@ -346,30 +355,6 @@ export const ControlOfficeGantt: React.FC<ControlOfficeGanttProps> = ({
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Selected Possession Action Bar */}
-      <div className="bg-slate-50 border border-slate-200 text-slate-800 px-4 py-3 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-2xs">
-        <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
-          <span className="text-slate-500 font-bold uppercase">SELECTED POSSESSION:</span>
-          <span className="font-bold text-slate-900">
-            {selectedBlock?.block_code || 'BLK-20260829-002'} ({selectedBlock?.section_id || 'MAS-AJJ'} • {selectedBlock?.start_time || '02:30:00'} - {selectedBlock?.end_time || '05:00:00'})
-          </span>
-          <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${getStatusBadgeColor(selectedBlock?.status || 'APPROVED')}`}>
-            {selectedBlock?.status || 'APPROVED'}
-          </span>
-          <span className="text-[10px] text-emerald-700 font-sans font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-            ✓ 3 Departments Bundled (+5.3h Saved)
-          </span>
-        </div>
-
-        <button
-          onClick={onOpenStatutory}
-          className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-mono font-bold text-xs uppercase tracking-wider flex items-center space-x-1.5 transition-colors cursor-pointer shadow-xs"
-        >
-          <FileText className="w-4 h-4 text-white" />
-          <span>Form T/351 Portal</span>
-        </button>
       </div>
     </div>
   );
