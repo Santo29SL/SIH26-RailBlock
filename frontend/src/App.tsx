@@ -1,296 +1,270 @@
-import React, { useState, useEffect } from 'react';
-import { Header } from './components/Header';
-import { DualGantt } from './components/DualGantt';
-import { GisTrackMap } from './components/GisTrackMap';
-import { WhatIfSimulator } from './components/WhatIfSimulator';
-import { RiskInspector } from './components/RiskInspector';
-import { StatutoryModal } from './components/StatutoryModal';
-import { AddEntryModal } from './components/AddEntryModal';
-import {
-  TrainMovement,
-  ScheduledBlock,
-  MaintenanceDefect,
-  fetchTrainMovements,
-  fetchScheduledBlocks,
-  fetchMaintenanceRequests,
-  runOptimizer,
-} from './api/client';
-import { ShieldCheck, Clock, Zap, CheckCircle, FileText, PlusCircle, Wrench, Train } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import type { Section, MaintenanceRequest, Block, ModelInfoResponse } from './api/client';
+import { fetchSections, fetchMaintenanceRequests, fetchBlocks, fetchModelInfo } from './api/client';
+import { DashboardTab } from './components/tabs/DashboardTab';
+import { PlannerTab } from './components/tabs/PlannerTab';
+import { RiskTab } from './components/tabs/RiskTab';
+import { BlocksTab } from './components/tabs/BlocksTab';
+import { FormsTab } from './components/tabs/FormsTab';
 
-export const App: React.FC = () => {
-  const [trains, setTrains] = useState<TrainMovement[]>([]);
-  const [blocks, setBlocks] = useState<ScheduledBlock[]>([]);
-  const [defects, setDefects] = useState<MaintenanceDefect[]>([]);
-  const [selectedSection, setSelectedSection] = useState<string>('ALL');
-  const [selectedBlock, setSelectedBlock] = useState<ScheduledBlock | null>(null);
-  const [modalBlock, setModalBlock] = useState<ScheduledBlock | null>(null);
-  const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
-  const [isOptimizing, setIsOptimizing] = useState<boolean>(false);
-  const [statusNotification, setStatusNotification] = useState<string | null>(null);
+// ── Types ─────────────────────────────────────────────────
 
-  // Load initial data
-  const loadData = async () => {
-    const [trData, blkData, defData] = await Promise.all([
-      fetchTrainMovements(),
-      fetchScheduledBlocks(),
-      fetchMaintenanceRequests(),
-    ]);
-    const safeTrains = Array.isArray(trData) ? trData : (trData as any)?.items || [];
-    const safeBlocks = Array.isArray(blkData) ? blkData : (blkData as any)?.items || [];
-    const safeDefects = Array.isArray(defData) ? defData : (defData as any)?.items || [];
-    setTrains(safeTrains);
-    setBlocks(safeBlocks);
-    setDefects(safeDefects);
-    if (safeBlocks.length > 0 && !selectedBlock) {
-      setSelectedBlock(safeBlocks[0]);
-    }
-  };
+type Tab = 'dashboard' | 'planner' | 'risk' | 'blocks' | 'forms';
+type ToastType = 'info' | 'error' | 'success';
+
+interface Toast {
+  id: number;
+  message: string;
+  type: ToastType;
+}
+
+// ── App ───────────────────────────────────────────────────
+
+export default function App() {
+  // Global state
+  const [sections, setSections] = useState<Section[]>([]);
+  const [selectedSectionId, setSelectedSectionId] = useState('');
+  const [defects, setDefects] = useState<MaintenanceRequest[]>([]);
+  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [modelInfo, setModelInfo] = useState<ModelInfoResponse | null>(null);
+
+  // UI state
+  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  const [sectionsLoading, setSectionsLoading] = useState(true);
+  const [defectsLoading, setDefectsLoading] = useState(false);
+  const [blocksLoading, setBlocksLoading] = useState(false);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [toastCounter, setToastCounter] = useState(0);
+
+  // Clock
+  const [clock, setClock] = useState('');
 
   useEffect(() => {
-    loadData();
+    const tick = () => {
+      const now = new Date();
+      setClock(now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' }) + ' IST');
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
   }, []);
 
-  // Run CP-SAT solver
-  const handleRunOptimizer = async (horizonDays: number) => {
-    setIsOptimizing(true);
-    setStatusNotification(`Running Google OR-Tools CP-SAT Space-Time Solver for ${horizonDays}-day horizon...`);
-    try {
-      const res = await runOptimizer('2026-08-29', horizonDays);
-      setStatusNotification(res.message);
-      await loadData();
-    } finally {
-      setIsOptimizing(false);
-      setTimeout(() => setStatusNotification(null), 5000);
-    }
-  };
+  // Notification system
+  const notify = useCallback((message: string, type: ToastType = 'info') => {
+    const id = toastCounter + 1;
+    setToastCounter(id);
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
+  }, [toastCounter]);
 
-  // Block state transition
-  const handleTransitionSuccess = (blockId: string, newStatus: string, pn: string) => {
-    setBlocks((prev) =>
-      prev.map((b) =>
-        b.id === blockId
-          ? {
-              ...b,
-              status: newStatus as any,
-              disconnection_pn: pn,
-            }
-          : b
-      )
-    );
-    if (selectedBlock?.id === blockId) {
-      setSelectedBlock((prev) => (prev ? { ...prev, status: newStatus as any, disconnection_pn: pn } : null));
-    }
-  };
+  // Load sections
+  useEffect(() => {
+    setSectionsLoading(true);
+    fetchSections()
+      .then(s => {
+        setSections(s);
+        if (s.length > 0) setSelectedSectionId(s[0].id);
+      })
+      .catch(e => notify(`Could not connect to backend: ${e.message}`, 'error'))
+      .finally(() => setSectionsLoading(false));
 
-  // Add new defect from modal
-  const handleAddDefect = (newDefect: MaintenanceDefect) => {
-    setDefects((prev) => [newDefect, ...prev]);
-    setStatusNotification(`✅ Logged ${newDefect.request_code} (${newDefect.activity_type}) with AI Criticality Index ${newDefect.criticality_index}/100.`);
-  };
+    fetchModelInfo()
+      .then(setModelInfo)
+      .catch(() => { /* model info optional */ });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Add new train from modal
-  const handleAddTrain = (newTrain: TrainMovement) => {
-    setTrains((prev) => [...prev, newTrain]);
-    setStatusNotification(`✅ Injected train #${newTrain.train_number} (${newTrain.train_name}) from ${newTrain.entry_time} to ${newTrain.exit_time}.`);
-  };
+  // Load defects & blocks when section changes
+  const loadDefects = useCallback(() => {
+    setDefectsLoading(true);
+    fetchMaintenanceRequests({ section_id: selectedSectionId || undefined, page_size: 100 })
+      .then(res => setDefects(res.items))
+      .catch(e => notify(e.message, 'error'))
+      .finally(() => setDefectsLoading(false));
+  }, [selectedSectionId, notify]);
 
-  // Filter trains & blocks by section
-  const filteredTrains = selectedSection === 'ALL' ? trains : trains;
-  const filteredBlocks =
-    selectedSection === 'ALL'
-      ? blocks
-      : blocks.filter((b) => b.section_code === selectedSection);
+  const loadBlocks = useCallback(() => {
+    setBlocksLoading(true);
+    fetchBlocks({ section_id: selectedSectionId || undefined, page_size: 100 })
+      .then(res => setBlocks(res.items))
+      .catch(e => notify(e.message, 'error'))
+      .finally(() => setBlocksLoading(false));
+  }, [selectedSectionId, notify]);
+
+  useEffect(() => {
+    loadDefects();
+    loadBlocks();
+  }, [selectedSectionId, loadDefects, loadBlocks]);
+
+  const selectedSection = sections.find(s => s.id === selectedSectionId) ?? null;
+
+  const TABS: { key: Tab; label: string }[] = [
+    { key: 'dashboard', label: '🏠 Dashboard' },
+    { key: 'planner', label: '🤖 Optimizer & Planner' },
+    { key: 'risk', label: '⚠ Risk Inspector' },
+    { key: 'blocks', label: '📋 Block Lifecycle' },
+    { key: 'forms', label: '📄 Statutory Forms' },
+  ];
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f0f2f5', display: 'flex', flexDirection: 'column' }}>
-      {/* IRCTC Official Header */}
-      <Header
-        activeSection={selectedSection}
-        onSectionChange={setSelectedSection}
-        onRunOptimizer={handleRunOptimizer}
-        isOptimizing={isOptimizing}
-      />
-
-      {/* Main Content Area */}
-      <main className="ir-container" style={{ flex: 1, marginTop: '8px' }}>
-        
-        {/* Live Notification Bar */}
-        {statusNotification && (
-          <div
-            style={{
-              background: '#002244',
-              color: '#ffffff',
-              padding: '8px 12px',
-              marginBottom: '10px',
-              borderLeft: '4px solid #f37021',
-              fontSize: '12px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <span>{statusNotification}</span>
-            <button
-              onClick={() => setStatusNotification(null)}
-              style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', fontWeight: 700 }}
-            >
-              ✕
-            </button>
-          </div>
-        )}
-
-        {/* Division KPI Metrics Bar */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px', marginBottom: '12px' }}>
-          <div className="ir-panel" style={{ margin: 0, padding: '10px', borderLeft: '4px solid #003366' }}>
-            <div style={{ fontSize: '11px', color: '#666666', fontWeight: 700 }}>ACTIVE SCHEDULED BLOCKS</div>
-            <div style={{ fontSize: '20px', fontWeight: 900, color: '#003366' }}>
-              {blocks.length} POSSESSIONS
-            </div>
-            <div style={{ fontSize: '10px', color: '#2e7d32' }}>All G&SR Safety Conflicts Resolved</div>
-          </div>
-
-          <div className="ir-panel" style={{ margin: 0, padding: '10px', borderLeft: '4px solid #2e7d32' }}>
-            <div style={{ fontSize: '11px', color: '#666666', fontWeight: 700 }}>SHADOW OVERLAP SAVED</div>
-            <div style={{ fontSize: '20px', fontWeight: 900, color: '#2e7d32' }}>
-              5.3 HOURS
-            </div>
-            <div style={{ fontSize: '10px', color: '#555555' }}>Bundled across Track, S&T & TRD</div>
-          </div>
-
-          <div className="ir-panel" style={{ margin: 0, padding: '10px', borderLeft: '4px solid #c62828' }}>
-            <div style={{ fontSize: '11px', color: '#666666', fontWeight: 700 }}>TIER-1 VIP PROTECTION</div>
-            <div style={{ fontSize: '20px', fontWeight: 900, color: '#c62828' }}>
-              0 MINS DELAY
-            </div>
-            <div style={{ fontSize: '10px', color: '#c62828' }}>Hard Constraint: Zero VIP Detention</div>
-          </div>
-
-          <div className="ir-panel" style={{ margin: 0, padding: '10px', borderLeft: '4px solid #f37021' }}>
-            <div style={{ fontSize: '11px', color: '#666666', fontWeight: 700 }}>AI CRITICALITY RESOLVED</div>
-            <div style={{ fontSize: '20px', fontWeight: 900, color: '#f37021' }}>
-              171.6 / 200 PTS
-            </div>
-            <div style={{ fontSize: '10px', color: '#555555' }}>CatBoost Monotone Hazard Model</div>
-          </div>
-        </div>
-
-        {/* Live Manual Ingestion Sandbox Action Bar */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            background: '#ffffff',
-            border: '1px solid #999999',
-            padding: '6px 10px',
-            marginBottom: '8px',
-          }}
-        >
-          <div style={{ fontSize: '11px', fontWeight: 700, color: '#003366', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <PlusCircle size={14} color="#f37021" />
-            <span>DISPATCH ACTION: MANUAL ASSET / TRAIN INGESTION</span>
-          </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              className="ir-btn ir-btn-primary"
-              onClick={() => setIsAddModalOpen(true)}
-              style={{ fontSize: '11px', padding: '4px 10px' }}
-            >
-              <Wrench size={12} />
-              + LOG DEFECT / ISSUE (TMS / SMMS / TDMS)
-            </button>
-            <button
-              className="ir-btn ir-btn-navy"
-              onClick={() => setIsAddModalOpen(true)}
-              style={{ fontSize: '11px', padding: '4px 10px' }}
-            >
-              <Train size={12} />
-              + INJECT TRAIN MOVEMENT
-            </button>
-          </div>
-        </div>
-
-        {/* 1. Dual-Swimlane Gantt Timeline */}
-        <DualGantt
-          trains={filteredTrains}
-          blocks={filteredBlocks}
-          selectedBlockId={selectedBlock?.id || null}
-          onSelectBlock={(b) => setSelectedBlock(b)}
-        />
-
-        {/* Selected Block Quick Actions Strip */}
-        {selectedBlock && (
-          <div
-            style={{
-              background: '#ffffff',
-              border: '1px solid #999999',
-              padding: '8px 12px',
-              marginBottom: '12px',
-              display: 'flex',
-              flexWrap: 'wrap',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              gap: '8px',
-            }}
-          >
+    <div style={{ minHeight: '100vh', background: 'var(--ir-gray-bg)' }}>
+      {/* Header */}
+      <div style={{ background: 'var(--ir-navy)', borderBottom: '3px solid var(--ir-orange)', position: 'sticky', top: 0, zIndex: 100 }}>
+        <div style={{ maxWidth: 1440, margin: '0 auto', padding: '0 10px', display: 'flex', alignItems: 'center', gap: 10, height: 48 }}>
+          {/* Logo + Title */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 32, height: 32, background: 'var(--ir-orange)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 14, color: '#fff' }}>IR</div>
             <div>
-              <span style={{ fontWeight: 700, color: '#003366' }}>SELECTED POSSESSION: </span>
-              <strong>{selectedBlock.block_code}</strong> ({selectedBlock.section_code} • {selectedBlock.start_time} - {selectedBlock.end_time})
-              <span style={{ marginLeft: '10px' }} className={`ir-badge ${selectedBlock.status === 'APPROVED' ? 'ir-badge-completed' : selectedBlock.status === 'ACTIVE' ? 'ir-badge-active' : 'ir-badge-proposed'}`}>
-                {selectedBlock.status}
-              </span>
+              <div style={{ color: '#fff', fontWeight: 900, fontSize: 13, letterSpacing: 1, lineHeight: 1.1 }}>RailBlock DSS</div>
+              <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 }}>Automated Block Planning — SIH 2026 | PS 26027</div>
             </div>
+          </div>
 
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                className="ir-btn ir-btn-navy"
-                onClick={() => setModalBlock(selectedBlock)}
+          <div style={{ flex: 1 }} />
+
+          {/* Section Picker */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, textTransform: 'uppercase' }}>Section:</span>
+            {sectionsLoading ? (
+              <span style={{ color: '#fff', fontSize: 12 }}>Loading...</span>
+            ) : sections.length === 0 ? (
+              <span style={{ color: '#f44336', fontSize: 11 }}>⚠ DB Empty — seed data first</span>
+            ) : (
+              <select
+                style={{ background: '#004d99', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', padding: '3px 8px', fontSize: 12, fontWeight: 700 }}
+                value={selectedSectionId}
+                onChange={e => setSelectedSectionId(e.target.value)}
               >
-                <FileText size={13} />
-                OPEN FORM T/351 & T/D 602 PORTAL
-              </button>
+                <option value="">All Sections</option>
+                {sections.map(s => (
+                  <option key={s.id} value={s.id}>{s.section_code} — {s.division}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Section info pills */}
+          {selectedSection && (
+            <div style={{ display: 'flex', gap: 6, fontSize: 10 }}>
+              <span style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', padding: '2px 8px' }}>{selectedSection.zone}</span>
+              <span style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', padding: '2px 8px' }}>{selectedSection.length_km} km</span>
+              <span style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', padding: '2px 8px' }}>{selectedSection.line_type}</span>
             </div>
+          )}
+
+          {/* Backend status + Clock */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ color: sections.length > 0 ? '#66bb6a' : '#ef5350', fontSize: 10 }}>
+              {sections.length > 0 ? '● BACKEND ONLINE' : '● BACKEND OFFLINE'}
+            </span>
+            <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: 11, fontFamily: 'Roboto Mono, monospace' }}>{clock}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="ir-tabs" style={{ position: 'sticky', top: 48, zIndex: 90 }}>
+        <div style={{ maxWidth: 1440, margin: '0 auto', display: 'flex', width: '100%' }}>
+          {TABS.map(t => (
+            <button
+              key={t.key}
+              className={`ir-tab ${activeTab === t.key ? 'active' : ''}`}
+              onClick={() => setActiveTab(t.key)}
+            >
+              {t.label}
+            </button>
+          ))}
+          {/* Live block count badges */}
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', fontSize: 10 }}>
+            <span style={{ background: '#f37021', color: '#fff', padding: '2px 8px', fontWeight: 700 }}>
+              {blocks.filter(b => b.status === 'ACTIVE').length} ACTIVE
+            </span>
+            <span style={{ background: '#003366', color: '#fff', padding: '2px 8px', fontWeight: 700 }}>
+              {blocks.filter(b => b.status === 'PROPOSED').length} PROPOSED
+            </span>
+            <span style={{ background: '#c62828', color: '#fff', padding: '2px 8px', fontWeight: 700 }}>
+              {defects.filter(d => d.priority === 'CRITICAL' && d.status === 'PENDING').length} CRITICAL PENDING
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="ir-container" style={{ paddingTop: 10, maxWidth: 1440 }}>
+        {/* Error banner if no sections */}
+        {!sectionsLoading && sections.length === 0 && (
+          <div className="ir-error" style={{ marginBottom: 12 }}>
+            ⚠ <strong>Backend database appears empty.</strong> Please ensure the FastAPI server is running on <code>localhost:8000</code> and the database has been seeded with{' '}
+            <code>python -m app.scripts.seed_all</code>. All data displayed is live from the database — no dummy data is shown.
           </div>
         )}
 
-        {/* 2. Middle Row: Leaflet GIS Track Map + What-If Simulation Sandbox */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-          <GisTrackMap defects={defects} selectedSection={selectedSection} />
-          <WhatIfSimulator
-            selectedBlock={selectedBlock}
-            onBlockUpdated={loadData}
+        {activeTab === 'dashboard' && (
+          <DashboardTab
+            section={selectedSection}
+            defects={defects}
+            onNotify={notify}
           />
-        </div>
+        )}
 
-        {/* 3. Bottom Row: Multi-Department Defect Inspector & SHAP Reasoning */}
-        <RiskInspector defects={defects} />
+        {activeTab === 'planner' && (
+          <PlannerTab
+            section={selectedSection}
+            sections={sections}
+            defects={defects}
+            onNotify={notify}
+            onBlocksUpdated={loadBlocks}
+          />
+        )}
 
-      </main>
+        {activeTab === 'risk' && (
+          <RiskTab
+            defects={defects}
+            modelInfo={modelInfo}
+            loading={defectsLoading}
+            onNotify={notify}
+          />
+        )}
 
-      {/* Statutory Form T/351 & T/D 602 Modal */}
-      <StatutoryModal
-        block={modalBlock}
-        onClose={() => setModalBlock(null)}
-        onTransitionSuccess={handleTransitionSuccess}
-      />
+        {activeTab === 'blocks' && (
+          <BlocksTab
+            blocks={blocks}
+            sections={sections}
+            loading={blocksLoading}
+            onNotify={notify}
+            onRefresh={loadBlocks}
+          />
+        )}
 
-      {/* Manual Defect & Train Movement Ingestion Modal */}
-      <AddEntryModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onAddDefect={handleAddDefect}
-        onAddTrain={handleAddTrain}
-      />
+        {activeTab === 'forms' && (
+          <FormsTab
+            blocks={blocks}
+            sections={sections}
+            onNotify={notify}
+            onRefresh={() => { loadDefects(); loadBlocks(); }}
+          />
+        )}
+      </div>
 
       {/* Footer */}
-      <footer style={{ background: '#002244', color: '#b0bec5', padding: '8px 16px', fontSize: '11px', borderTop: '2px solid #f37021', textAlign: 'center' }}>
-        <div>
-          CENTRE FOR RAILWAY INFORMATION SYSTEMS (CRIS) • RESEARCH DESIGNS AND STANDARDS ORGANISATION (RDSO)
-        </div>
-        <div style={{ fontSize: '10px', marginTop: '2px' }}>
-          RailBlock Decision Support System • Smart India Hackathon 2026 (PS 26027) • Strictly conforms to Indian Railways G&SR & IRPWM Operating Manuals
-        </div>
-      </footer>
+      <div style={{ background: '#002244', color: 'rgba(255,255,255,0.4)', fontSize: 10, textAlign: 'center', padding: '8px 0', marginTop: 20, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+        RAILBLOCK DECISION SUPPORT SYSTEM — Smart India Hackathon 2026 | PS 26027 | Indian Railways Engineering Department
+        &nbsp;|&nbsp; All data is live from PostgreSQL. No sample or dummy data is shown.
+      </div>
+
+      {/* Toast notifications */}
+      <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 9999, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {toasts.map(t => (
+          <div
+            key={t.id}
+            className={`ir-toast ${t.type}`}
+            onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))}
+            style={{ cursor: 'pointer' }}
+          >
+            {t.type === 'error' ? '✘' : t.type === 'success' ? '✔' : 'ℹ'} {t.message}
+          </div>
+        ))}
+      </div>
     </div>
   );
-};
+}

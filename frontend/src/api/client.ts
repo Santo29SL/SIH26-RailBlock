@@ -1,8 +1,36 @@
 /**
- * RailBlock Frontend API Client
- * Connects to FastAPI Backend at http://localhost:8000/api/v1
- * with built-in realistic fallback fixtures for instant evaluation.
+ * RailBlock API Client
+ * Live calls to FastAPI backend at http://localhost:8000/api/v1
+ * No fallback/static data — all data comes from the database.
  */
+
+const BASE = 'http://localhost:8000/api/v1';
+
+// ── Generic fetch wrapper ─────────────────────────────────
+
+async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const url = `${BASE}${path}`;
+  const res = await fetch(url, {
+    headers: { 'Content-Type': 'application/json', ...(options.headers ?? {}) },
+    ...options,
+  });
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try { detail = (await res.json())?.detail ?? detail; } catch { /* */ }
+    throw new Error(detail);
+  }
+  return res.json() as Promise<T>;
+}
+
+// ── Types mirroring backend schemas ──────────────────────
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
 
 export interface Section {
   id: string;
@@ -11,43 +39,112 @@ export interface Section {
   division: string;
   zone: string;
   length_km: number;
-  line_type: string;
-  max_permissible_speed: number;
-  feeding_post_name?: string;
-  sectioning_post_name?: string;
+  line_type: 'SINGLE' | 'DOUBLE' | 'TRIPLE' | 'QUADRUPLE';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Train {
+  id: string;
+  train_number: string;
+  train_name: string;
+  train_type: 'EXPRESS' | 'SUPERFAST' | 'MAIL' | 'LOCAL' | 'FREIGHT';
+  priority: 'LOW' | 'MEDIUM' | 'HIGH';
+  created_at: string;
+  updated_at: string;
 }
 
 export interface TrainMovement {
   id: string;
-  train_number: string;
-  train_name: string;
-  train_type: 'PASSENGER' | 'EXPRESS' | 'SUPERFAST' | 'PREMIUM' | 'FREIGHT';
-  priority: 'TIER_1_VIP' | 'TIER_2_EXPRESS' | 'TIER_3_FREIGHT';
-  movement_type?: 'SCHEDULED_PASSENGER' | 'FORECAST_FREIGHT';
-  direction: 'UP' | 'DOWN';
-  entry_time: string; // HH:MM:SS
-  exit_time: string;  // HH:MM:SS
-  is_vip: boolean;
+  train_id: string;
+  section_id: string;
+  departure_time: string;
+  arrival_time: string;
+  day_of_week: number;
+  movement_type: 'SCHEDULED' | 'FORECAST_FREIGHT';
+  is_active: boolean;
+  created_at: string;
+  // Joined train data
+  train?: Train;
+}
+
+export interface MaintenanceRequest {
+  id: string;
+  request_code: string;
+  section_id: string;
+  department: 'TRACK' | 'SIGNAL' | 'TRACTION';
+  activity_type: string;
+  duration_minutes: number;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  deadline: string;
+  status: 'PENDING' | 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
+  resource_id?: string;
+  metadata_json?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface BlockJob {
   id: string;
+  maintenance_request_id: string;
+  sequence_order: number;
+  created_at: string;
+}
+
+export interface Block {
+  id: string;
+  block_code: string;
+  section_id: string;
+  block_date: string;
+  start_time: string;
+  end_time: string;
+  duration_minutes: number;
+  train_impact_count: number;
+  impact_score: number;
+  status: 'PROPOSED' | 'APPROVED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  optimizer_metadata?: Record<string, unknown>;
+  block_jobs: BlockJob[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BlockTransitionRequest {
+  target_status: 'PROPOSED' | 'APPROVED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  private_number?: string;
+  disconnection_private_number?: string;
+  reconnection_private_number?: string;
+  station_master_name?: string;
+  field_engineer_name?: string;
+  field_engineer_designation?: string;
+  disconnection_time?: string;
+  reconnection_time?: string;
+  tsr_imposed?: boolean;
+  tsr_speed_kmph?: number;
+  approved_by?: string;
+  remarks?: string;
+}
+
+export interface ScheduledBlockJob {
+  id?: string;
+  maintenance_request_id: string;
   request_code: string;
   department: 'TRACK' | 'SIGNAL' | 'TRACTION';
   activity_type: string;
   duration_minutes: number;
+  start_offset_minutes: number;
+  end_offset_minutes: number;
   criticality_index: number;
   is_primary: boolean;
 }
 
 export interface ScheduledBlock {
-  id: string;
+  id?: string;
   block_code: string;
-  section_code: string;
-  section_name: string;
+  section_id: string;
+  section_code?: string;
   block_date: string;
-  start_time: string; // HH:MM:SS
-  end_time: string;   // HH:MM:SS
+  start_time: string;
+  end_time: string;
   duration_minutes: number;
   is_joint_shadow_block: boolean;
   primary_department: 'TRACK' | 'SIGNAL' | 'TRACTION';
@@ -55,499 +152,309 @@ export interface ScheduledBlock {
   total_criticality_index: number;
   shadow_overlap_hours: number;
   estimated_train_detention_minutes: number;
-  status: 'PROPOSED' | 'APPROVED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
-  disconnection_pn?: string;
-  reconnection_pn?: string;
-  jobs: BlockJob[];
+  status: string;
+  optimizer_metadata?: Record<string, unknown>;
+  jobs: ScheduledBlockJob[];
 }
 
-export interface MaintenanceDefect {
-  id: string;
-  request_code: string;
-  department: 'TRACK' | 'SIGNAL' | 'TRACTION';
-  activity_type: string;
-  section_code: string;
-  kilometer_marker?: string;
-  priority: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
-  days_overdue: number;
-  criticality_index: number;
-  failure_probability?: number;
-  shap_reasoning?: string;
-  metadata: {
-    tgi_deviation?: number;
-    speed_restriction_kmh?: number;
-    usfd_flaw_severity?: string | number;
-    point_failure_risk?: number;
-    ohe_insulator_wear?: number;
-    section_gmt_density?: number;
-    days_overdue?: number;
-  };
+export interface OptimizerRunRequest {
+  target_date: string;
+  section_ids?: string[];
+  horizon_days?: number;
+  safety_buffer_minutes?: number;
+  min_gap_minutes?: number;
+  persist_to_db?: boolean;
 }
 
-export interface SimulationResult {
+export interface OptimizerRunResponse {
+  run_id: string;
+  target_date: string;
+  solver_status: string;
+  total_blocks_scheduled: number;
+  total_maintenance_requests_covered: number;
+  total_unassigned_requests: number;
+  total_shadow_overlap_hours: number;
+  total_train_detention_minutes: number;
+  total_criticality_index: number;
+  objective_value?: number;
+  solver_execution_time_ms: number;
+  scheduled_blocks: ScheduledBlock[];
+  unassigned_request_ids: string[];
+}
+
+export interface ConflictingTrain {
+  train_id: string;
+  train_number: string;
+  train_name: string;
+  train_type: string;
+  priority: string;
+  scheduled_departure: string;
+  scheduled_arrival: string;
+  expected_detention_minutes: number;
+  detention_penalty_tier: number;
+  is_hard_conflict: boolean;
+}
+
+export interface WhatIfSimulationRequest {
+  simulation_name?: string;
+  block_id?: string;
+  section_id: string;
+  target_date: string;
+  start_time: string;
+  end_time: string;
+  maintenance_request_ids: string[];
+  allow_slw_fallback?: boolean;
+}
+
+export interface WhatIfSimulationResponse {
   simulation_id: string;
   is_feasible: boolean;
-  has_vip_conflict: boolean;
+  has_vip_train_conflict: boolean;
   detention_delta_minutes: number;
   total_detention_minutes: number;
-  conflicting_trains: string[];
-  criticality_preserved_pct: number;
+  conflicting_trains_count: number;
+  conflicting_trains: ConflictingTrain[];
+  risk_score_delta: number;
+  criticality_index_preserved_pct: number;
   shadow_efficiency_score: number;
-  tslw_advisory_required: boolean;
+  slw_advisory_required: boolean;
   commit_token: string;
   expires_at: string;
 }
 
-const API_BASE = 'http://localhost:8000/api/v1';
-
-// ── Realistic Fallback Datasets (MAS-AJJ Chennai Division) ──
-
-export const FALLBACK_SECTIONS: Section[] = [
-  {
-    id: 'sec-mas-per',
-    section_code: 'MAS-PER',
-    section_name: 'Chennai Central - Perambur',
-    division: 'Chennai',
-    zone: 'Southern Railway',
-    length_km: 5.6,
-    line_type: 'DOUBLE',
-    max_permissible_speed: 110,
-    feeding_post_name: 'FP-MAS',
-    sectioning_post_name: 'SP-PER',
-  },
-  {
-    id: 'sec-per-trl',
-    section_code: 'PER-TRL',
-    section_name: 'Perambur - Tiruvallur',
-    division: 'Chennai',
-    zone: 'Southern Railway',
-    length_km: 36.4,
-    line_type: 'DOUBLE',
-    max_permissible_speed: 130,
-    feeding_post_name: 'FP-PER',
-    sectioning_post_name: 'SP-TRL',
-  },
-  {
-    id: 'sec-trl-ajj',
-    section_code: 'TRL-AJJ',
-    section_name: 'Tiruvallur - Arakkonam',
-    division: 'Chennai',
-    zone: 'Southern Railway',
-    length_km: 27.2,
-    line_type: 'DOUBLE',
-    max_permissible_speed: 130,
-    feeding_post_name: 'FP-TRL',
-    sectioning_post_name: 'SP-AJJ',
-  },
-];
-
-export const FALLBACK_TRAINS: TrainMovement[] = [
-  {
-    id: 'tr-20607',
-    train_number: '20607',
-    train_name: 'Vande Bharat Express (MAS-MYS)',
-    train_type: 'PREMIUM',
-    priority: 'TIER_1_VIP',
-    movement_type: 'SCHEDULED_PASSENGER',
-    direction: 'DOWN',
-    entry_time: '05:50:00',
-    exit_time: '06:35:00',
-    is_vip: true,
-  },
-  {
-    id: 'tr-12621',
-    train_number: '12621',
-    train_name: 'Tamil Nadu Superfast Express',
-    train_type: 'SUPERFAST',
-    priority: 'TIER_2_EXPRESS',
-    movement_type: 'SCHEDULED_PASSENGER',
-    direction: 'UP',
-    entry_time: '07:15:00',
-    exit_time: '07:55:00',
-    is_vip: false,
-  },
-  {
-    id: 'tr-12007',
-    train_number: '12007',
-    train_name: 'Shatabdi Express (MAS-MYS)',
-    train_type: 'PREMIUM',
-    priority: 'TIER_1_VIP',
-    movement_type: 'SCHEDULED_PASSENGER',
-    direction: 'DOWN',
-    entry_time: '06:00:00',
-    exit_time: '06:45:00',
-    is_vip: true,
-  },
-  {
-    id: 'tr-43001',
-    train_number: '43001',
-    train_name: 'Chennai-Arakkonam EMU Local',
-    train_type: 'PASSENGER',
-    priority: 'TIER_2_EXPRESS',
-    movement_type: 'SCHEDULED_PASSENGER',
-    direction: 'DOWN',
-    entry_time: '08:15:00',
-    exit_time: '09:10:00',
-    is_vip: false,
-  },
-  {
-    id: 'tr-boxn-1',
-    train_number: 'BOXN-8841',
-    train_name: 'Coal Freight Rake (Ennore Port)',
-    train_type: 'FREIGHT',
-    priority: 'TIER_3_FREIGHT',
-    movement_type: 'FORECAST_FREIGHT',
-    direction: 'UP',
-    entry_time: '12:00:00',
-    exit_time: '12:55:00',
-    is_vip: false,
-  },
-  {
-    id: 'tr-12675',
-    train_number: '12675',
-    train_name: 'Kovai Express (MAS-CBE)',
-    train_type: 'SUPERFAST',
-    priority: 'TIER_2_EXPRESS',
-    movement_type: 'SCHEDULED_PASSENGER',
-    direction: 'DOWN',
-    entry_time: '14:20:00',
-    exit_time: '15:05:00',
-    is_vip: false,
-  },
-];
-
-export const FALLBACK_BLOCKS: ScheduledBlock[] = [
-  {
-    id: 'blk-001',
-    block_code: 'BLK-20260829-001',
-    section_code: 'PER-TRL',
-    section_name: 'Perambur - Tiruvallur',
-    block_date: '2026-08-29',
-    start_time: '02:00:00',
-    end_time: '05:00:00',
-    duration_minutes: 180,
-    is_joint_shadow_block: true,
-    primary_department: 'TRACK',
-    participating_departments: ['TRACK', 'SIGNAL', 'TRACTION'],
-    total_criticality_index: 89.2,
-    shadow_overlap_hours: 3.5,
-    estimated_train_detention_minutes: 0,
-    status: 'APPROVED',
-    disconnection_pn: 'PN-4821',
-    jobs: [
-      {
-        id: 'job-1',
-        request_code: 'MR-TRK-104',
-        department: 'TRACK',
-        activity_type: 'Machine Tamping (CSM)',
-        duration_minutes: 180,
-        criticality_index: 89.2,
-        is_primary: true,
-      },
-      {
-        id: 'job-2',
-        request_code: 'MR-SIG-088',
-        department: 'SIGNAL',
-        activity_type: 'Point Machine 114B Inspection',
-        duration_minutes: 90,
-        criticality_index: 64.0,
-        is_primary: false,
-      },
-      {
-        id: 'job-3',
-        request_code: 'MR-TRD-041',
-        department: 'TRACTION',
-        activity_type: 'OHE Contact Wire Stagger Adjustment',
-        duration_minutes: 120,
-        criticality_index: 58.5,
-        is_primary: false,
-      },
-    ],
-  },
-  {
-    id: 'blk-002',
-    block_code: 'BLK-20260829-002',
-    section_code: 'TRL-AJJ',
-    section_name: 'Tiruvallur - Arakkonam',
-    block_date: '2026-08-29',
-    start_time: '09:30:00',
-    end_time: '11:45:00',
-    duration_minutes: 135,
-    is_joint_shadow_block: true,
-    primary_department: 'TRACK',
-    participating_departments: ['TRACK', 'SIGNAL'],
-    total_criticality_index: 82.4,
-    shadow_overlap_hours: 1.8,
-    estimated_train_detention_minutes: 0,
-    status: 'PROPOSED',
-    jobs: [
-      {
-        id: 'job-4',
-        request_code: 'MR-TRK-112',
-        department: 'TRACK',
-        activity_type: 'USFD Flaw Rail Renewal (IMR)',
-        duration_minutes: 135,
-        criticality_index: 82.4,
-        is_primary: true,
-      },
-      {
-        id: 'job-5',
-        request_code: 'MR-SIG-095',
-        department: 'SIGNAL',
-        activity_type: 'Axle Counter Sensor Calibration',
-        duration_minutes: 60,
-        criticality_index: 47.0,
-        is_primary: false,
-      },
-    ],
-  },
-];
-
-export const FALLBACK_DEFECTS: MaintenanceDefect[] = [
-  {
-    id: 'def-1',
-    request_code: 'MR-TRK-104',
-    department: 'TRACK',
-    activity_type: 'Machine Tamping (CSM)',
-    section_code: 'PER-TRL',
-    kilometer_marker: 'KM 42/10 - 45/00',
-    priority: 'CRITICAL',
-    days_overdue: 14,
-    criticality_index: 89.2,
-    failure_probability: 0.62,
-    shap_reasoning: 'Base failure rate 8%. USFD flaw +22 pts, 80 km/h TSR +14, 14 days overdue +9, heavy freight section +6 → 62% failure probability; CI 89.2 = riskier than 89% of divisional backlog.',
-    metadata: {
-      tgi_deviation: 82.5,
-      speed_restriction_kmh: 80.0,
-      usfd_flaw_severity: 'IMR',
-      section_gmt_density: 65.0,
-    },
-  },
-  {
-    id: 'def-2',
-    request_code: 'MR-SIG-088',
-    department: 'SIGNAL',
-    activity_type: 'Point Machine 114B Overhaul',
-    section_code: 'PER-TRL',
-    kilometer_marker: 'TRL Yard North Point',
-    priority: 'HIGH',
-    days_overdue: 9,
-    criticality_index: 64.0,
-    failure_probability: 0.38,
-    shap_reasoning: 'Point machine locking latency exceeded 4.5s (+18 pts); recommended for bundling inside track shadow window.',
-    metadata: {
-      point_failure_risk: 78.0,
-      days_overdue: 9,
-      section_gmt_density: 50.0,
-    },
-  },
-  {
-    id: 'def-3',
-    request_code: 'MR-TRD-041',
-    department: 'TRACTION',
-    activity_type: 'OHE Contact Wire Stagger Check',
-    section_code: 'PER-TRL',
-    kilometer_marker: 'KM 30/14 (FP-PER Zone)',
-    priority: 'MEDIUM',
-    days_overdue: 5,
-    criticality_index: 58.5,
-    failure_probability: 0.29,
-    shap_reasoning: 'OHE wire wear at 26% (+14 pts); bundled to utilize single power isolation in Substation FP-PER zone.',
-    metadata: {
-      ohe_insulator_wear: 68.0,
-      days_overdue: 5,
-      section_gmt_density: 50.0,
-    },
-  },
-];
-
-// ── API Fetch Functions with Offline Graceful Fallback ──
-
-export async function fetchSections(): Promise<Section[]> {
-  try {
-    const res = await fetch(`${API_BASE}/sections`);
-    if (res.ok) {
-      const data = await res.json();
-      const raw = Array.isArray(data) ? data : data?.items || [];
-      if (raw.length > 0) {
-        return raw.map((s: any, idx: number) => ({
-          id: s.id || `sec-${idx}`,
-          section_code: s.section_code || 'MAS-PER',
-          section_name: s.section_name || s.section_code || 'Mainline Section',
-          division: s.division || 'Chennai',
-          zone: s.zone || 'Southern Railway',
-          length_km: s.length_km || 10.0,
-          line_type: s.line_type || 'DOUBLE',
-          max_permissible_speed: s.max_permissible_speed || 110,
-          feeding_post_name: s.feeding_post_name || 'FP-MAS',
-          sectioning_post_name: s.sectioning_post_name || 'SP-PER',
-        }));
-      }
-    }
-  } catch (e) {
-    // offline fallback
-  }
-  return FALLBACK_SECTIONS;
+export interface CommitSimulationResponse {
+  success: boolean;
+  message: string;
+  block_id: string;
+  block_code: string;
+  committed_at: string;
 }
 
-export async function fetchTrainMovements(sectionId?: string): Promise<TrainMovement[]> {
-  try {
-    const url = sectionId ? `${API_BASE}/train-movements?section_id=${sectionId}` : `${API_BASE}/train-movements`;
-    const res = await fetch(url);
-    if (res.ok) {
-      const data = await res.json();
-      const raw = Array.isArray(data) ? data : data?.items || [];
-      if (raw.length > 0) {
-        return raw.slice(0, 15).map((tr: any, idx: number) => {
-          const entryTime = tr.entry_time || tr.departure_time || '06:00:00';
-          const exitTime = tr.exit_time || tr.arrival_time || '06:45:00';
-          const isFreight = tr.movement_type === 'FORECAST_FREIGHT';
-          const isVip = tr.is_vip ?? (idx % 3 === 0);
-          return {
-            id: tr.id || `tr-${idx}`,
-            train_number: tr.train_number || (tr.train_id ? String(tr.train_id).substring(0, 5) : `${12000 + idx}`),
-            train_name: tr.train_name || (isVip ? 'Vande Bharat Express' : isFreight ? 'Goods Coal Rake' : 'Express Superfast'),
-            train_type: tr.train_type || (isVip ? 'PREMIUM' : isFreight ? 'FREIGHT' : 'SUPERFAST'),
-            priority: tr.priority || (isVip ? 'TIER_1_VIP' : isFreight ? 'TIER_3_FREIGHT' : 'TIER_2_EXPRESS'),
-            movement_type: tr.movement_type || (isFreight ? 'FORECAST_FREIGHT' : 'SCHEDULED_PASSENGER'),
-            direction: tr.direction || (idx % 2 === 0 ? 'UP' : 'DOWN'),
-            entry_time: entryTime,
-            exit_time: exitTime,
-            is_vip: isVip,
-          };
-        });
-      }
-    }
-  } catch (e) {
-    // offline fallback
-  }
-  return FALLBACK_TRAINS;
+export interface RiskPredictionRequest {
+  request_code?: string;
+  department?: string;
+  activity_type?: string;
+  priority?: string;
+  scoring_mode?: string;
+  tgi_deviation?: number;
+  speed_restriction_kmh?: number;
+  days_overdue?: number;
+  section_gmt_density?: number;
+  point_failure_risk?: number;
+  ohe_insulator_wear?: number;
+  usfd_flaw_severity?: number;
+  usfd_classification?: string;
+  metadata_json?: Record<string, unknown>;
 }
 
-export async function fetchScheduledBlocks(sectionId?: string): Promise<ScheduledBlock[]> {
-  try {
-    const url = sectionId ? `${API_BASE}/blocks?section_id=${sectionId}` : `${API_BASE}/blocks`;
-    const res = await fetch(url);
-    if (res.ok) {
-      const data = await res.json();
-      const raw = Array.isArray(data) ? data : data?.items || [];
-      if (raw.length > 0) {
-        return raw.map((blk: any, idx: number) => ({
-          id: blk.id || `blk-${idx}`,
-          block_code: blk.block_code || `BLK-20260829-${String(idx + 1).padStart(3, '0')}`,
-          section_code: blk.section_code || 'PER-TRL',
-          section_name: blk.section_name || 'Perambur - Tiruvallur',
-          block_date: blk.block_date || '2026-08-29',
-          start_time: blk.start_time || '02:00:00',
-          end_time: blk.end_time || '05:00:00',
-          duration_minutes: blk.duration_minutes || 180,
-          is_joint_shadow_block: blk.is_joint_shadow_block ?? true,
-          primary_department: blk.primary_department || 'TRACK',
-          participating_departments: blk.participating_departments || ['TRACK', 'SIGNAL', 'TRACTION'],
-          total_criticality_index: blk.total_criticality_index ?? 85.0,
-          shadow_overlap_hours: blk.shadow_overlap_hours ?? 3.2,
-          estimated_train_detention_minutes: blk.estimated_train_detention_minutes ?? 0,
-          status: blk.status || 'APPROVED',
-          disconnection_pn: blk.disconnection_pn,
-          jobs: blk.jobs || [],
-        }));
-      }
-    }
-  } catch (e) {
-    // offline fallback
-  }
-  return FALLBACK_BLOCKS;
-}
-
-export async function fetchMaintenanceRequests(): Promise<MaintenanceDefect[]> {
-  try {
-    const res = await fetch(`${API_BASE}/maintenance`);
-    if (res.ok) {
-      const data = await res.json();
-      const raw = Array.isArray(data) ? data : data?.items || [];
-      if (raw.length > 0) {
-        return raw.slice(0, 10).map((item: any, idx: number) => {
-          const meta = item.metadata || item.metadata_json || {};
-          const daysOverdue = item.days_overdue ?? meta.days_overdue ?? 8;
-          const ci = item.criticality_index ?? (daysOverdue > 10 ? 89.2 : 64.0);
-          return {
-            id: item.id || `def-${idx}`,
-            request_code: item.request_code || `MR-${item.department || 'TRK'}-${100 + idx}`,
-            department: item.department || 'TRACK',
-            activity_type: item.activity_type || 'Track Machine Tamping',
-            section_code: item.section_code || 'PER-TRL',
-            kilometer_marker: item.kilometer_marker || 'KM 42/10 - 45/00',
-            priority: item.priority || (ci >= 80 ? 'CRITICAL' : 'HIGH'),
-            days_overdue: daysOverdue,
-            criticality_index: ci,
-            failure_probability: item.failure_probability ?? (ci / 100 * 0.7),
-            shap_reasoning: item.shap_reasoning || `Asset evaluated on ${item.section_code || 'PER-TRL'}: ${item.activity_type || 'Defect'} overdue by ${daysOverdue} days. Probability-space SHAP indicates high priority inside shadow block.`,
-            metadata: {
-              tgi_deviation: meta.tgi_deviation ?? 80.0,
-              speed_restriction_kmh: meta.speed_restriction_kmh ?? 30,
-              usfd_flaw_severity: meta.usfd_flaw_severity ?? 'IMR',
-              point_failure_risk: meta.point_failure_risk ?? 40.0,
-              ohe_insulator_wear: meta.ohe_insulator_wear ?? 30.0,
-              section_gmt_density: meta.section_gmt_density ?? 55.0,
-              days_overdue: daysOverdue,
-            },
-          };
-        });
-      }
-    }
-  } catch (e) {
-    // offline fallback
-  }
-  return FALLBACK_DEFECTS;
-}
-
-export async function runOptimizer(targetDate: string, horizonDays: number = 1): Promise<{ success: boolean; message: string }> {
-  try {
-    const res = await fetch(`${API_BASE}/optimizer/run?horizon_days=${horizonDays}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ target_date: targetDate, horizon_days: horizonDays }),
-    });
-    if (res.ok) {
-      return { success: true, message: `Optimizer solved schedule for ${targetDate} (Horizon: ${horizonDays} days).` };
-    }
-  } catch (e) {
-    // fallback
-  }
-  return { success: true, message: `[Simulated] CP-SAT solver successfully optimized 2 blocks over ${horizonDays}-day horizon.` };
-}
-
-export async function runSimulation(blockId: string, shiftMinutes: number): Promise<SimulationResult> {
-  // If backend is active
-  try {
-    const res = await fetch(`${API_BASE}/optimizer/simulate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        block_id: blockId,
-        target_date: '2026-08-29',
-        start_time: shiftMinutes > 0 ? '03:30:00' : '01:30:00',
-        end_time: shiftMinutes > 0 ? '06:30:00' : '04:30:00',
-        maintenance_request_ids: ['def-1', 'def-2'],
-      }),
-    });
-    if (res.ok) return await res.json();
-  } catch (e) {
-    // simulated fallback
-  }
-
-  const isVipConflict = shiftMinutes > 90;
-  return {
-    simulation_id: 'sim-' + Math.random().toString(36).substring(7),
-    is_feasible: !isVipConflict,
-    has_vip_conflict: isVipConflict,
-    detention_delta_minutes: isVipConflict ? 45 : Math.max(0, shiftMinutes - 30),
-    total_detention_minutes: isVipConflict ? 45 : 0,
-    conflicting_trains: isVipConflict ? ['#20607 Vande Bharat Express'] : [],
-    criticality_preserved_pct: 100.0,
-    shadow_efficiency_score: 92.5,
-    tslw_advisory_required: isVipConflict,
-    commit_token: 'hmac-sha256-verified-sim-token-' + Date.now(),
-    expires_at: new Date(Date.now() + 15 * 60000).toISOString(),
+export interface RiskPredictionResponse {
+  request_code?: string;
+  failure_probability: number;
+  criticality_index: number;
+  model_used: string;
+  shap_explanation: {
+    space: string;
+    base_value: number;
+    feature_attributions: Record<string, number>;
+    human_readable_reasoning: string;
   };
+  scoring_mode?: string;
+  extracted_features?: Record<string, unknown>;
+}
+
+export interface ModelInfoResponse {
+  model_name?: string;
+  version?: string;
+  status?: string;
+  created_at?: string;
+  metrics?: Record<string, number>;
+  disclaimer?: string;
+}
+
+export interface Resource {
+  id: string;
+  name: string;
+  department: string;
+  quantity: number;
+  is_available: boolean;
+}
+
+// ── Sections ──────────────────────────────────────────────
+
+export async function fetchSections(pageSize = 100): Promise<Section[]> {
+  const res = await apiFetch<PaginatedResponse<Section>>(`/sections?page=1&page_size=${pageSize}`);
+  return res.items;
+}
+
+export async function fetchSectionById(id: string): Promise<Section> {
+  return apiFetch<Section>(`/sections/${id}`);
+}
+
+export async function fetchSectionGapAnalysis(sectionId: string, targetDate: string) {
+  return apiFetch(`/sections/${sectionId}/gap-analysis?target_date=${targetDate}`);
+}
+
+// ── Train Movements ───────────────────────────────────────
+
+export async function fetchTrainMovements(sectionId?: string, dayOfWeek?: number): Promise<TrainMovement[]> {
+  let query = '/train-movements?page=1&page_size=200';
+  if (sectionId) query += `&section_id=${sectionId}`;
+  if (dayOfWeek !== undefined) query += `&day_of_week=${dayOfWeek}`;
+  const res = await apiFetch<PaginatedResponse<TrainMovement>>(query);
+  return res.items;
+}
+
+export async function fetchTrains(pageSize = 200): Promise<Train[]> {
+  const res = await apiFetch<PaginatedResponse<Train>>(`/trains?page=1&page_size=${pageSize}`);
+  return res.items;
+}
+
+// ── Maintenance Requests ──────────────────────────────────
+
+export async function fetchMaintenanceRequests(params?: {
+  section_id?: string;
+  department?: string;
+  status?: string;
+  priority?: string;
+  page?: number;
+  page_size?: number;
+}): Promise<PaginatedResponse<MaintenanceRequest>> {
+  let query = '/maintenance?page=1&page_size=50';
+  if (params?.section_id) query += `&section_id=${params.section_id}`;
+  if (params?.department) query += `&department=${params.department}`;
+  if (params?.status) query += `&status=${params.status}`;
+  if (params?.priority) query += `&priority=${params.priority}`;
+  if (params?.page) query += `&page=${params.page}`;
+  if (params?.page_size) query += `&page_size=${params.page_size}`;
+  return apiFetch<PaginatedResponse<MaintenanceRequest>>(query);
+}
+
+// ── Blocks ────────────────────────────────────────────────
+
+export async function fetchBlocks(params?: {
+  section_id?: string;
+  status?: string;
+  page?: number;
+  page_size?: number;
+}): Promise<PaginatedResponse<Block>> {
+  let query = '/blocks?page=1&page_size=50';
+  if (params?.section_id) query += `&section_id=${params.section_id}`;
+  if (params?.status) query += `&status=${params.status}`;
+  if (params?.page) query += `&page=${params.page}`;
+  if (params?.page_size) query += `&page_size=${params.page_size}`;
+  return apiFetch<PaginatedResponse<Block>>(query);
+}
+
+export async function fetchBlockById(id: string): Promise<Block> {
+  return apiFetch<Block>(`/blocks/${id}`);
+}
+
+export async function transitionBlock(id: string, payload: BlockTransitionRequest): Promise<Block> {
+  return apiFetch<Block>(`/blocks/${id}/transition`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function exportBlockBDMS(id: string) {
+  return apiFetch(`/blocks/${id}/export-bdms`);
+}
+
+export async function exportBlockT351(id: string) {
+  return apiFetch(`/blocks/${id}/t351-notice`);
+}
+
+export async function exportBlockTD602(id: string) {
+  return apiFetch(`/blocks/${id}/td602-sheet`);
+}
+
+// ── Optimizer ─────────────────────────────────────────────
+
+export async function runOptimizer(payload: OptimizerRunRequest): Promise<OptimizerRunResponse> {
+  return apiFetch<OptimizerRunResponse>('/optimizer/run', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function simulateBlock(payload: WhatIfSimulationRequest): Promise<WhatIfSimulationResponse> {
+  return apiFetch<WhatIfSimulationResponse>('/optimizer/simulate', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function commitSimulation(commitToken: string, approvedBy?: string, notes?: string): Promise<CommitSimulationResponse> {
+  return apiFetch<CommitSimulationResponse>('/optimizer/commit-simulation', {
+    method: 'POST',
+    body: JSON.stringify({ commit_token: commitToken, approved_by: approvedBy, notes }),
+  });
+}
+
+export async function rescheduleBlock(payload: {
+  active_block_id: string;
+  delay_minutes: number;
+  reason?: string;
+}) {
+  return apiFetch('/optimizer/reschedule', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+// ── Risk Scoring ──────────────────────────────────────────
+
+export async function predictRisk(payload: RiskPredictionRequest): Promise<RiskPredictionResponse> {
+  return apiFetch<RiskPredictionResponse>('/risk/predict', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchModelInfo(): Promise<ModelInfoResponse> {
+  return apiFetch<ModelInfoResponse>('/risk/model-info');
+}
+
+// ── Resources ─────────────────────────────────────────────
+
+export async function fetchResources(): Promise<Resource[]> {
+  const res = await apiFetch<PaginatedResponse<Resource>>('/resources?page=1&page_size=100');
+  return res.items;
+}
+
+// ── Ingestion ─────────────────────────────────────────────
+
+export async function ingestTMS(payload: {
+  section_id: string;
+  usfd_classification?: string;
+  tgi_deviation?: number;
+  chainage_km?: number;
+  curvature_deg?: number;
+  duration_minutes?: number;
+}) {
+  return apiFetch('/ingest/tms', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export async function ingestSMMS(payload: {
+  section_id: string;
+  point_failure_risk?: number;
+  station_code?: string;
+  duration_minutes?: number;
+}) {
+  return apiFetch('/ingest/smms', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export async function ingestTDMS(payload: {
+  section_id: string;
+  ohe_wear_pct?: number;
+  feeding_post?: string;
+  duration_minutes?: number;
+}) {
+  return apiFetch('/ingest/tdms', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+// ── Health ────────────────────────────────────────────────
+
+export async function fetchHealth() {
+  return apiFetch('/health');
 }
