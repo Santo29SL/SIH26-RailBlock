@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Block, Section } from '../../api/client';
-import { transitionBlock, rescheduleBlock } from '../../api/client';
+import { transitionBlock, rescheduleBlock, fetchBlockById } from '../../api/client';
 
 interface Props {
   blocks: Block[];
@@ -33,7 +33,28 @@ export function BlocksTab({ blocks, sections, loading, onNotify, onRefresh }: Pr
   const [reschedLoading, setReschedLoading] = useState(false);
 
   const sectionMap = Object.fromEntries((sections ?? []).map(s => [s.id, s]));
-  const filtered = (blocks ?? []).filter(b => !statusFilter || b.status === statusFilter);
+  const filtered = (blocks ?? []).filter(b => b && (!statusFilter || b.status === statusFilter));
+
+  async function selectBlock(b: Block) {
+    if (!b) return;
+    setSelectedBlock(b);
+    setDiscPn(''); setReconnPn(''); setSmName(''); setEngName('');
+    setEngDesig(''); setApprovedBy(''); setRemarks('');
+    setTsrImposed(false);
+    try {
+      const full = await fetchBlockById(b.id);
+      if (full) setSelectedBlock(full);
+    } catch {
+      // Keep b if fetchBlockById fails
+    }
+  }
+
+  useEffect(() => {
+    if (filtered.length > 0 && !selectedBlock) {
+      selectBlock(filtered[0]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocks]);
 
   async function doTransition(targetStatus: string) {
     if (!selectedBlock) return;
@@ -91,12 +112,7 @@ export function BlocksTab({ blocks, sections, loading, onNotify, onRefresh }: Pr
     return '';
   }
 
-  function selectBlock(b: Block) {
-    setSelectedBlock(b);
-    setDiscPn(''); setReconnPn(''); setSmName(''); setEngName('');
-    setEngDesig(''); setApprovedBy(''); setRemarks('');
-    setTsrImposed(false);
-  }
+
 
   const meta = (selectedBlock?.optimizer_metadata ?? {}) as Record<string, unknown>;
   const jobs = selectedBlock?.block_jobs ?? [];

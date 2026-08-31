@@ -78,7 +78,7 @@ def _get_block_primary_department(block: Block, meta: dict) -> DepartmentEnum:
 
 @router.get(
     "",
-    response_model=PaginatedResponse[BlockResponse],
+    response_model=PaginatedResponse[BlockDetailResponse],
     summary="List blocks",
 )
 async def list_blocks(
@@ -87,15 +87,21 @@ async def list_blocks(
     section_id: Optional[UUID] = Query(None),
     status_filter: Optional[BlockStatusEnum] = Query(None, alias="status"),
     db: AsyncSession = Depends(get_db),
-) -> PaginatedResponse[BlockResponse]:
+) -> PaginatedResponse[BlockDetailResponse]:
     """List maintenance blocks with optional section/status filtering."""
-    filters = {
-        "section_id": section_id,
-        "status": status_filter.value if status_filter else None,
-    }
-    items, total = await get_items(
-        db, Block, page=page, page_size=page_size, filters=filters
-    )
+    query = select(Block).options(selectinload(Block.block_jobs))
+    if section_id:
+        query = query.where(Block.section_id == section_id)
+    if status_filter:
+        query = query.where(Block.status == status_filter.value)
+
+    from sqlalchemy import func
+    count_query = select(func.count()).select_from(query.subquery())
+    total = (await db.execute(count_query)).scalar_one()
+
+    query = query.order_by(Block.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    items = list((await db.execute(query)).scalars().all())
+
     return PaginatedResponse(
         items=items,
         total=total,
