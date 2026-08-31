@@ -22,7 +22,7 @@ services:
       - bash
       - -c
       - |
-        PGPASSWORD=railblock psql -h postgres -U railblock -d railblock -c "CREATE DATABASE airflow;" || true &&
+        PGPASSWORD=postgres psql -h postgres -U postgres -d railblock -c "CREATE DATABASE airflow;" || true &&
         airflow db migrate &&
         airflow users create \
           --username admin \
