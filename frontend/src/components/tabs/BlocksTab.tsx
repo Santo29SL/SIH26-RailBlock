@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import type { Block, Section } from '../../api/client';
 import { transitionBlock, rescheduleBlock } from '../../api/client';
 
@@ -32,8 +32,8 @@ export function BlocksTab({ blocks, sections, loading, onNotify, onRefresh }: Pr
   const [delayMin, setDelayMin] = useState(25);
   const [reschedLoading, setReschedLoading] = useState(false);
 
-  const sectionMap = Object.fromEntries(sections.map(s => [s.id, s]));
-  const filtered = blocks.filter(b => !statusFilter || b.status === statusFilter);
+  const sectionMap = Object.fromEntries((sections ?? []).map(s => [s.id, s]));
+  const filtered = (blocks ?? []).filter(b => !statusFilter || b.status === statusFilter);
 
   async function doTransition(targetStatus: string) {
     if (!selectedBlock) return;
@@ -74,7 +74,7 @@ export function BlocksTab({ blocks, sections, loading, onNotify, onRefresh }: Pr
     setReschedLoading(true);
     try {
       await rescheduleBlock({ active_block_id: selectedBlock.id, delay_minutes: delayMin });
-      onNotify('Greedy rescheduler executed — check advisory in console', 'success');
+      onNotify('Greedy rescheduler executed — check advisory', 'success');
     } catch (e: unknown) {
       onNotify(e instanceof Error ? e.message : 'Reschedule failed', 'error');
     } finally {
@@ -83,7 +83,7 @@ export function BlocksTab({ blocks, sections, loading, onNotify, onRefresh }: Pr
   }
 
   function stateClass(status: string, current: string) {
-    const ci = STATUS_FLOW.indexOf(current);
+    const ci = STATUS_FLOW.indexOf(current ?? '');
     const si = STATUS_FLOW.indexOf(status);
     if (current === 'CANCELLED') return status === current ? 'cancelled-state' : '';
     if (si < ci) return 'done-state';
@@ -98,7 +98,8 @@ export function BlocksTab({ blocks, sections, loading, onNotify, onRefresh }: Pr
     setTsrImposed(false);
   }
 
-  const meta = selectedBlock?.optimizer_metadata as Record<string, unknown> | undefined;
+  const meta = (selectedBlock?.optimizer_metadata ?? {}) as Record<string, unknown>;
+  const jobs = selectedBlock?.block_jobs ?? [];
 
   return (
     <div className="ir-two-col" style={{ alignItems: 'start' }}>
@@ -122,27 +123,32 @@ export function BlocksTab({ blocks, sections, loading, onNotify, onRefresh }: Pr
           {loading ? (
             <div className="ir-loading"><div className="ir-spinner" /> Loading blocks...</div>
           ) : filtered.length === 0 ? (
-            <div className="ir-empty">No blocks found. Run the AI Optimizer (Planner tab) to generate blocks.</div>
+            <div className="ir-empty">No blocks found. Run the AI Optimizer (Planner tab) or What-If Simulator to generate blocks.</div>
           ) : (
             <table className="ir-table">
               <thead>
                 <tr><th>Block Code</th><th>Section</th><th>Date</th><th>Window</th><th>Status</th><th>Jobs</th></tr>
               </thead>
               <tbody>
-                {filtered.map(b => (
-                  <tr
-                    key={b.id}
-                    style={{ cursor: 'pointer', background: selectedBlock?.id === b.id ? '#e3f2fd' : undefined }}
-                    onClick={() => selectBlock(b)}
-                  >
-                    <td className="mono">{b.block_code}</td>
-                    <td>{sectionMap[b.section_id]?.section_code ?? b.section_id.slice(0, 8)}</td>
-                    <td>{b.block_date}</td>
-                    <td>{b.start_time.slice(0, 5)} – {b.end_time.slice(0, 5)}</td>
-                    <td><span className={`ir-badge ir-badge-${b.status.toLowerCase()}`}>{b.status}</span></td>
-                    <td>{b.block_jobs.length}</td>
-                  </tr>
-                ))}
+                {filtered.map(b => {
+                  const startTime = (b.start_time ?? '').slice(0, 5);
+                  const endTime = (b.end_time ?? '').slice(0, 5);
+                  const numJobs = (b.block_jobs ?? []).length;
+                  return (
+                    <tr
+                      key={b.id}
+                      style={{ cursor: 'pointer', background: selectedBlock?.id === b.id ? '#e3f2fd' : undefined }}
+                      onClick={() => selectBlock(b)}
+                    >
+                      <td className="mono">{b.block_code}</td>
+                      <td>{sectionMap[b.section_id]?.section_code ?? (b.section_id ? b.section_id.slice(0, 8) : '—')}</td>
+                      <td>{b.block_date ?? '—'}</td>
+                      <td>{startTime} – {endTime}</td>
+                      <td><span className={`ir-badge ir-badge-${(b.status ?? '').toLowerCase()}`}>{b.status}</span></td>
+                      <td>{numJobs}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
@@ -165,19 +171,21 @@ export function BlocksTab({ blocks, sections, loading, onNotify, onRefresh }: Pr
               <div className="ir-panel-body">
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10, fontSize: 12 }}>
                   <div><span className="ir-label">Section: </span>{sectionMap[selectedBlock.section_id]?.section_code ?? '—'}</div>
-                  <div><span className="ir-label">Date: </span>{selectedBlock.block_date}</div>
-                  <div><span className="ir-label">Time Window: </span>{selectedBlock.start_time.slice(0, 5)} – {selectedBlock.end_time.slice(0, 5)}</div>
-                  <div><span className="ir-label">Duration: </span>{selectedBlock.duration_minutes} min</div>
-                  <div><span className="ir-label">Train Impact: </span>{selectedBlock.train_impact_count} trains | Score: {selectedBlock.impact_score.toFixed(2)}</div>
-                  <div><span className="ir-label">Status: </span><span className={`ir-badge ir-badge-${selectedBlock.status.toLowerCase()}`}>{selectedBlock.status}</span></div>
-                  {Boolean(meta?.primary_department) && (
-                    <div><span className="ir-label">Primary Dept: </span><span className={`ir-badge ir-badge-${String(meta?.primary_department).toLowerCase()}`}>{String(meta?.primary_department)}</span></div>
+                  <div><span className="ir-label">Date: </span>{selectedBlock.block_date ?? '—'}</div>
+                  <div><span className="ir-label">Time Window: </span>{(selectedBlock.start_time ?? '').slice(0, 5)} – {(selectedBlock.end_time ?? '').slice(0, 5)}</div>
+                  <div><span className="ir-label">Duration: </span>{selectedBlock.duration_minutes ?? 0} min</div>
+                  <div><span className="ir-label">Train Impact: </span>{selectedBlock.train_impact_count ?? 0} trains | Score: {Number(selectedBlock.impact_score ?? 0).toFixed(2)}</div>
+                  <div><span className="ir-label">Status: </span><span className={`ir-badge ir-badge-${(selectedBlock.status ?? '').toLowerCase()}`}>{selectedBlock.status}</span></div>
+                  {Boolean(meta.primary_department) && (
+                    <div><span className="ir-label">Primary Dept: </span><span className={`ir-badge ir-badge-${String(meta.primary_department).toLowerCase()}`}>{String(meta.primary_department)}</span></div>
                   )}
-                  {meta?.is_joint_shadow_block !== undefined && <div><span className="ir-label">Block Type: </span><strong>{String(meta.is_joint_shadow_block) === 'true' ? 'JOINT SHADOW BLOCK' : 'PRIMARY BLOCK'}</strong></div>}
-                  {meta?.shadow_overlap_hours !== undefined && (
+                  {meta.is_joint_shadow_block !== undefined && (
+                    <div><span className="ir-label">Block Type: </span><strong>{String(meta.is_joint_shadow_block) === 'true' ? 'JOINT SHADOW BLOCK' : 'PRIMARY BLOCK'}</strong></div>
+                  )}
+                  {meta.shadow_overlap_hours !== undefined && (
                     <div><span className="ir-label">Shadow Hours: </span>{Number(meta.shadow_overlap_hours).toFixed(2)}</div>
                   )}
-                  {meta?.total_criticality_index !== undefined && (
+                  {meta.total_criticality_index !== undefined && (
                     <div><span className="ir-label">Total CI: </span>{Number(meta.total_criticality_index).toFixed(1)}</div>
                   )}
                 </div>
@@ -188,13 +196,16 @@ export function BlocksTab({ blocks, sections, loading, onNotify, onRefresh }: Pr
                 <div className="ir-label" style={{ marginBottom: 4 }}>G&amp;SR Block Lifecycle:</div>
                 <div className="ir-state-flow">
                   {STATUS_FLOW.map((s, i) => (
-                    <>
-                      {i > 0 && <span key={`arrow-${i}`} className="ir-state-arrow">→</span>}
-                      <span key={s} className={`ir-state-node ${stateClass(s, selectedBlock.status)}`}>{s}</span>
-                    </>
+                    <React.Fragment key={s}>
+                      {i > 0 && <span className="ir-state-arrow">→</span>}
+                      <span className={`ir-state-node ${stateClass(s, selectedBlock.status)}`}>{s}</span>
+                    </React.Fragment>
                   ))}
                   {selectedBlock.status === 'CANCELLED' && (
-                    <><span className="ir-state-arrow">|</span><span className="ir-state-node cancelled-state">CANCELLED</span></>
+                    <>
+                      <span className="ir-state-arrow">|</span>
+                      <span className="ir-state-node cancelled-state">CANCELLED</span>
+                    </>
                   )}
                 </div>
 
@@ -314,21 +325,21 @@ export function BlocksTab({ blocks, sections, loading, onNotify, onRefresh }: Pr
             </div>
 
             {/* Block Jobs */}
-            {selectedBlock.block_jobs.length > 0 && (
+            {jobs.length > 0 && (
               <div className="ir-panel">
-                <div className="ir-panel-header">Bundled Jobs in this Block ({selectedBlock.block_jobs.length})</div>
+                <div className="ir-panel-header">Bundled Jobs in this Block ({jobs.length})</div>
                 <div className="ir-panel-body">
                   <table className="ir-table">
                     <thead>
                       <tr><th>#</th><th>Maintenance Request ID</th><th>Sequence / Role</th><th>Added On</th></tr>
                     </thead>
                     <tbody>
-                      {selectedBlock.block_jobs.map((j, i) => (
-                        <tr key={j.id}>
+                      {jobs.map((j, i) => (
+                        <tr key={j.id ?? i}>
                           <td>{i + 1}</td>
-                          <td className="mono" style={{ fontSize: 10 }}>{j.maintenance_request_id}</td>
-                          <td>{j.sequence_order === 1 ? <strong>PRIMARY (Anchor)</strong> : `Shadow Activity #${j.sequence_order}`}</td>
-                          <td>{new Date(j.created_at).toLocaleString('en-IN')}</td>
+                          <td className="mono" style={{ fontSize: 10 }}>{j.maintenance_request_id ?? '—'}</td>
+                          <td>{j.sequence_order === 1 ? <strong>PRIMARY (Anchor)</strong> : `Shadow Activity #${j.sequence_order ?? i + 1}`}</td>
+                          <td>{j.created_at ? new Date(j.created_at).toLocaleString('en-IN') : '—'}</td>
                         </tr>
                       ))}
                     </tbody>
