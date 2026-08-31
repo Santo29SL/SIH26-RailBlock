@@ -297,14 +297,14 @@ export async function fetchSectionGapAnalysis(sectionId: string, targetDate: str
 // ── Train Movements ───────────────────────────────────────
 
 export async function fetchTrainMovements(sectionId?: string, dayOfWeek?: number): Promise<TrainMovement[]> {
-  let query = '/train-movements?page=1&page_size=200';
+  let query = '/train-movements?page=1&page_size=100';
   if (sectionId) query += `&section_id=${sectionId}`;
   if (dayOfWeek !== undefined) query += `&day_of_week=${dayOfWeek}`;
   const res = await apiFetch<PaginatedResponse<TrainMovement>>(query);
   return res.items;
 }
 
-export async function fetchTrains(pageSize = 200): Promise<Train[]> {
+export async function fetchTrains(pageSize = 100): Promise<Train[]> {
   const res = await apiFetch<PaginatedResponse<Train>>(`/trains?page=1&page_size=${pageSize}`);
   return res.items;
 }
