@@ -22,7 +22,7 @@ services:
       - bash
       - -c
       - |
-        python3 -c "import psycopg2; conn = psycopg2.connect('postgresql://postgres:postgres@postgres:5432/postgres'); conn.autocommit = True; cur = conn.cursor(); cur.execute('CREATE DATABASE airflow'); cur.close(); conn.close();" 2>/dev/null || true &&
+        python3 -c "import psycopg2; conn = psycopg2.connect('postgresql://postgres:postgres@postgres:5432/postgres'); conn.autocommit = True; cur = conn.cursor(); cur.execute(\"SELECT 1 FROM pg_database WHERE datname = 'airflow'\"); (not cur.fetchone() and cur.execute('CREATE DATABASE airflow')); cur.close(); conn.close()" || true &&
         airflow db migrate &&
         airflow users create \
           --username admin \
