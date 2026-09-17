@@ -144,10 +144,10 @@ export function MapView({ section, defects, blocks }: Props) {
           <div style="font-weight:700;color:#f37021;border-bottom:1px solid #ccc;padding-bottom:4px;margin-bottom:4px;">
             ${b.block_code}
           </div>
-          <div><b>Date:</b> ${b.block_date}</div>
-          <div><b>Window:</b> ${b.start_time.slice(0,5)} – ${b.end_time.slice(0,5)} (${b.duration_minutes} min)</div>
-          <div><b>Status:</b> ${b.status}</div>
-          <div><b>Jobs:</b> ${b.block_jobs.length} bundled</div>
+          <div><b>Date:</b> ${b.block_date ?? '—'}</div>
+          <div><b>Window:</b> ${(b.start_time ?? '').slice(0,5)} – ${(b.end_time ?? '').slice(0,5)} (${b.duration_minutes ?? 0} min)</div>
+          <div><b>Status:</b> ${b.status ?? 'PROPOSED'}</div>
+          <div><b>Jobs:</b> ${(b.block_jobs ?? []).length} bundled</div>
         </div>
       `);
     });

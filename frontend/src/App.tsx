@@ -6,6 +6,7 @@ import { PlannerTab } from './components/tabs/PlannerTab';
 import { RiskTab } from './components/tabs/RiskTab';
 import { BlocksTab } from './components/tabs/BlocksTab';
 import { FormsTab } from './components/tabs/FormsTab';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // ── Types ─────────────────────────────────────────────────
 
@@ -210,49 +211,59 @@ export default function App() {
         )}
 
         {activeTab === 'dashboard' && (
-          <DashboardTab
-            section={selectedSection}
-            defects={defects}
-            onNotify={notify}
-          />
+          <ErrorBoundary fallbackTitle="Dashboard Tab Error">
+            <DashboardTab
+              section={selectedSection}
+              defects={defects}
+              onNotify={notify}
+            />
+          </ErrorBoundary>
         )}
 
         {activeTab === 'planner' && (
-          <PlannerTab
-            section={selectedSection}
-            sections={sections}
-            defects={defects}
-            onNotify={notify}
-            onBlocksUpdated={loadBlocks}
-          />
+          <ErrorBoundary fallbackTitle="Planner Tab Error">
+            <PlannerTab
+              section={selectedSection}
+              sections={sections}
+              defects={defects}
+              onNotify={notify}
+              onBlocksUpdated={loadBlocks}
+            />
+          </ErrorBoundary>
         )}
 
         {activeTab === 'risk' && (
-          <RiskTab
-            defects={defects}
-            modelInfo={modelInfo}
-            loading={defectsLoading}
-            onNotify={notify}
-          />
+          <ErrorBoundary fallbackTitle="Risk Inspector Tab Error">
+            <RiskTab
+              defects={defects}
+              modelInfo={modelInfo}
+              loading={defectsLoading}
+              onNotify={notify}
+            />
+          </ErrorBoundary>
         )}
 
         {activeTab === 'blocks' && (
-          <BlocksTab
-            blocks={blocks}
-            sections={sections}
-            loading={blocksLoading}
-            onNotify={notify}
-            onRefresh={loadBlocks}
-          />
+          <ErrorBoundary fallbackTitle="Block Lifecycle Tab Error">
+            <BlocksTab
+              blocks={blocks}
+              sections={sections}
+              loading={blocksLoading}
+              onNotify={notify}
+              onRefresh={loadBlocks}
+            />
+          </ErrorBoundary>
         )}
 
         {activeTab === 'forms' && (
-          <FormsTab
-            blocks={blocks}
-            sections={sections}
-            onNotify={notify}
-            onRefresh={() => { loadDefects(); loadBlocks(); }}
-          />
+          <ErrorBoundary fallbackTitle="Statutory Forms Tab Error">
+            <FormsTab
+              blocks={blocks}
+              sections={sections}
+              onNotify={notify}
+              onRefresh={() => { loadDefects(); loadBlocks(); }}
+            />
+          </ErrorBoundary>
         )}
       </div>
 

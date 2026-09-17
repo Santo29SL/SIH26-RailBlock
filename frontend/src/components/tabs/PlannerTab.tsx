@@ -174,13 +174,13 @@ export function PlannerTab({ section, sections, defects, onNotify, onBlocksUpdat
                       {optResult.scheduled_blocks.map((b, i) => (
                         <tr key={i}>
                           <td className="mono">{b.block_code}</td>
-                          <td>{b.section_code ?? b.section_id.slice(0, 8)}</td>
-                          <td>{b.block_date}</td>
-                          <td>{b.start_time.slice(0, 5)} – {b.end_time.slice(0, 5)}</td>
-                          <td><span className={`ir-badge ir-badge-${b.primary_department.toLowerCase()}`}>{b.primary_department}</span></td>
-                          <td>{b.participating_departments.join(', ')}</td>
-                          <td>{b.total_criticality_index.toFixed(1)}</td>
-                          <td>{b.shadow_overlap_hours.toFixed(2)}</td>
+                          <td>{b.section_code ?? (b.section_id ? b.section_id.slice(0, 8) : '—')}</td>
+                          <td>{b.block_date ?? '—'}</td>
+                          <td>{(b.start_time ?? '').slice(0, 5)} – {(b.end_time ?? '').slice(0, 5)}</td>
+                          <td><span className={`ir-badge ir-badge-${(b.primary_department ?? 'TRACK').toLowerCase()}`}>{b.primary_department ?? 'TRACK'}</span></td>
+                          <td>{(b.participating_departments ?? []).join(', ')}</td>
+                          <td>{(b.total_criticality_index ?? 0).toFixed(1)}</td>
+                          <td>{(b.shadow_overlap_hours ?? 0).toFixed(2)}</td>
                           <td style={{ color: b.estimated_train_detention_minutes > 0 ? '#c62828' : 'inherit' }}>{b.estimated_train_detention_minutes}</td>
                           <td><span className={`ir-badge ${b.is_joint_shadow_block ? 'ir-badge-scheduled' : 'ir-badge-freight'}`}>{b.is_joint_shadow_block ? 'JOINT SHADOW' : 'PRIMARY'}</span></td>
                         </tr>
