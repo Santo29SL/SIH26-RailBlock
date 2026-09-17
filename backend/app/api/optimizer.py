@@ -200,7 +200,7 @@ async def run_optimizer(
     ),
     db: AsyncSession = Depends(get_db),
 ) -> OptimizerRunResponse:
-    """Execute Stage 3 -> Stage 4 -> Stage 5 block optimizer pipeline.
+    """Execute Stage 2 -> Stage 3 -> Stage 4 -> Stage 5 block optimizer pipeline.
 
     Fetches track sections, active train movements, pending maintenance requests,
     resources, and compatibility rules from the database, runs Google OR-Tools
@@ -249,7 +249,7 @@ async def run_optimizer(
     rule_result = await db.execute(select(CompatibilityRule))
     compatibility_rules = list(rule_result.scalars().all())
 
-    # 5. Run Stage 3 -> 4 -> 5 optimization pipeline
+    # 5. Run Stage 2 -> 3 -> 4 -> 5 optimization pipeline
     optimization_result = run_optimization_pipeline(
         movements=movements,
         requests=pending_requests,

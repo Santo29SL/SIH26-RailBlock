@@ -19,6 +19,7 @@ FROM python:3.11-slim
 # Install runtime dependencies only (libpq for asyncpg)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
+    libgomp1 \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -36,7 +37,7 @@ COPY . .
 
 # Copy and set up entrypoint
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 
 # Own the app directory
 RUN chown -R railblock:railblock /app
